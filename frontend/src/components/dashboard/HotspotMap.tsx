@@ -3,48 +3,60 @@ import L from 'leaflet';
 import { HotspotPoint } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { PriorityBadge, CategoryBadge } from '../common/Badge';
-import { MapPin, AlertTriangle, Users, Briefcase, ExternalLink, Info } from 'lucide-react';
+import {
+  Layers,
+  MapPin,
+  AlertTriangle,
+  Users,
+  Building,
+  ArrowRight,
+  TrendingUp,
+  FileCheck2,
+  Database
+} from 'lucide-react';
+import 'leaflet/dist/leaflet.css';
 
 interface HotspotMapProps {
   hotspots: HotspotPoint[];
-  onSelectHotspot?: (hotspot: HotspotPoint) => void;
 }
 
-export const HotspotMap: React.FC<HotspotMapProps> = ({
-  hotspots,
-  onSelectHotspot
-}) => {
+export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
+  const { setSelectedRecModal, recommendations, setSelectedDistrict, setAuthoritySubTab } = useApp();
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  const { setSelectedRecModal, recommendations, selectedCountry } = useApp();
-  const [selectedHotspot, setSelectedHotspot] = useState<HotspotPoint | null>(null);
-  const [activeLayer, setActiveLayer] = useState<'all' | 'critical' | 'roads' | 'water'>('all');
+  const [selectedPoint, setSelectedPoint] = useState<HotspotPoint | null>(null);
+  const [activeLayer, setActiveLayer] = useState<'demand' | 'deficit' | 'combined'>('combined');
+
+  useEffect(() => {
+    if (hotspots.length > 0 && !selectedPoint) {
+      setSelectedPoint(hotspots[0]);
+    }
+  }, [hotspots, selectedPoint]);
 
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      // Set initial view centered on Southern/Central India
       const map = L.map(mapContainerRef.current, {
-        center: [17.5, 78.8],
+        center: [17.5, 78.5],
         zoom: 6,
-        zoomControl: true,
-        attributionControl: false
+        scrollWheelZoom: false
       });
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd'
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
       }).addTo(map);
 
-      markersLayerRef.current = L.layerGroup().addTo(map);
+      layerGroupRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
     }
 
     return () => {
+      // Cleanup on unmount
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -52,257 +64,244 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
     };
   }, []);
 
-  // Update Center when Country Changes
+  // Update Markers & Layers when hotspots, selectedPoint, or activeLayer changes
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (selectedCountry === 'Brazil') {
-      mapInstanceRef.current.setView([-16.43, -41.00], 7);
-    } else if (selectedCountry === 'South Africa') {
-      mapInstanceRef.current.setView([-22.95, 30.46], 7);
-    } else if (selectedCountry === 'India') {
-      mapInstanceRef.current.setView([17.5, 78.8], 6);
-    } else {
-      mapInstanceRef.current.setView([15.0, 40.0], 3);
-    }
-  }, [selectedCountry]);
+    if (!mapInstanceRef.current || !layerGroupRef.current) return;
 
-  // Render Hotspots Markers
-  useEffect(() => {
-    if (!mapInstanceRef.current || !markersLayerRef.current) return;
+    layerGroupRef.current.clearLayers();
 
-    markersLayerRef.current.clearLayers();
-
-    const filtered = hotspots.filter((h) => {
-      if (activeLayer === 'critical') return h.priority_level === 'CRITICAL';
-      if (activeLayer === 'roads') return h.top_category.toLowerCase().includes('transport');
-      if (activeLayer === 'water') return h.top_category.toLowerCase().includes('water');
-      return true;
-    });
-
-    filtered.forEach((hotspot) => {
-      const isCritical = hotspot.priority_level === 'CRITICAL' || hotspot.composite_priority_score >= 85;
-      const isHigh = hotspot.priority_level === 'HIGH' || (hotspot.composite_priority_score >= 75 && hotspot.composite_priority_score < 85);
-
-      const fillColor = isCritical ? '#DC2626' : isHigh ? '#D97706' : '#2563EB';
-      const radius = Math.min(26, Math.max(12, Math.sqrt(hotspot.request_count) * 3.6));
-
-      // Create Custom SVG Circle Marker
-      const circle = L.circleMarker([hotspot.latitude, hotspot.longitude], {
-        radius: radius,
-        fillColor: fillColor,
-        color: '#FFFFFF',
-        weight: 2,
-        opacity: 0.95,
-        fillOpacity: 0.75
-      });
-
-      // Hover Tooltip
-      circle.bindTooltip(
-        `<div class="p-1 font-sans text-xs">
-          <div class="font-bold text-slate-900">${hotspot.district}, ${hotspot.state}</div>
-          <div class="text-slate-600">${hotspot.request_count} verified citizen requests</div>
-          <div class="font-mono text-xs font-bold text-rose-600">Priority Score: ${hotspot.composite_priority_score}/100 (${hotspot.priority_level})</div>
-        </div>`,
-        { direction: 'top', className: 'custom-leaflet-tooltip' }
-      );
-
-      // Click Event
-      circle.on('click', () => {
-        setSelectedHotspot(hotspot);
-        if (onSelectHotspot) onSelectHotspot(hotspot);
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.panTo([hotspot.latitude, hotspot.longitude]);
-        }
-      });
-
-      markersLayerRef.current?.addLayer(circle);
-
-      // Add pulsing outer ring for CRITICAL hotspots
-      if (isCritical) {
-        const pulseCircle = L.circleMarker([hotspot.latitude, hotspot.longitude], {
-          radius: radius + 8,
-          fillColor: fillColor,
-          color: fillColor,
-          weight: 1,
-          opacity: 0.4,
-          fillOpacity: 0.15,
-          className: 'hotspot-pulse'
-        });
-        markersLayerRef.current?.addLayer(pulseCircle);
+    hotspots.forEach((point) => {
+      let color = '#2563EB';
+      if (activeLayer === 'deficit') {
+        color = point.infrastructure_deficit_index > 65 ? '#E11D48' : point.infrastructure_deficit_index > 45 ? '#D97706' : '#2563EB';
+      } else {
+        if (point.priority_level === 'CRITICAL') color = '#E11D48';
+        else if (point.priority_level === 'HIGH') color = '#D97706';
+        else if (point.priority_level === 'MEDIUM') color = '#2563EB';
+        else color = '#64748B';
       }
-    });
-  }, [hotspots, activeLayer, onSelectHotspot]);
 
-  const handleOpenRecDetail = (district: string) => {
+      const radius = Math.min(26, Math.max(12, Math.sqrt(point.request_count) * 0.45));
+      const isSelected = selectedPoint?.district === point.district;
+
+      const circle = L.circleMarker([point.latitude, point.longitude], {
+        radius: radius,
+        fillColor: color,
+        color: isSelected ? '#0f172a' : color,
+        weight: isSelected ? 3 : 1.5,
+        opacity: 1,
+        fillOpacity: isSelected ? 0.85 : 0.65
+      });
+
+      const popupHtml = `
+        <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 170px; padding: 2px;">
+          <div style="font-weight: 700; font-size: 13px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 6px;">
+            ${point.district} (${point.state})
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 3px;">
+            Citizen Signals: <strong style="color: #0f172a;">${point.request_count.toLocaleString()}</strong>
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 3px;">
+            Primary Sector: <strong>${point.top_category}</strong>
+          </div>
+          <div style="font-size: 11px; color: #475569; margin-bottom: 4px;">
+            Infra Deficit: <strong style="color: #e11d48;">${point.infrastructure_deficit_index.toFixed(0)}/100</strong>
+          </div>
+          <div style="font-size: 11px; color: #1e40af; font-weight: 700; border-top: 1px solid #f1f5f9; padding-top: 4px;">
+            Priority Score: ${point.composite_priority_score}/100
+          </div>
+        </div>
+      `;
+
+      circle.bindPopup(popupHtml);
+
+      circle.on('click', () => {
+        setSelectedPoint(point);
+      });
+
+      layerGroupRef.current?.addLayer(circle);
+    });
+
+    if (selectedPoint && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([selectedPoint.latitude, selectedPoint.longitude], 7, {
+        duration: 1.2
+      });
+    }
+  }, [hotspots, selectedPoint, activeLayer]);
+
+  const handleOpenRec = (district: string) => {
     const matched = recommendations.find((r) => r.district.toLowerCase() === district.toLowerCase());
     if (matched) {
       setSelectedRecModal(matched);
     }
   };
 
+  const handleInspectRequests = (district: string) => {
+    setSelectedDistrict(district);
+    setAuthoritySubTab('explorer');
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-[560px]">
-      {/* Map Header & Filter Toolbar */}
-      <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Demand Hotspot Map & Infrastructure Gaps
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono font-medium">
-              {hotspots.length} Active Regional Clusters
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Circle size indicates citizen demand density • Color indicates AI Priority Severity
-          </p>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      {/* Map Header & Layer Toolbar */}
+      <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-blue-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            Geospatial Demand Clusters & Infrastructure Deficit Overlay
+          </h3>
         </div>
 
-        {/* Layer Filters */}
-        <div className="flex items-center gap-1.5 bg-white p-1 rounded-md border border-slate-200 text-xs font-medium">
+        {/* Map Layer Mode Toggles */}
+        <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-medium self-start sm:self-auto">
           <button
-            onClick={() => setActiveLayer('all')}
-            className={`px-2.5 py-1 rounded transition-all ${
-              activeLayer === 'all' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+            type="button"
+            onClick={() => setActiveLayer('combined')}
+            className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+              activeLayer === 'combined' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            All Hotspots
+            Composite Priority
           </button>
           <button
-            onClick={() => setActiveLayer('critical')}
-            className={`px-2.5 py-1 rounded transition-all ${
-              activeLayer === 'critical' ? 'bg-rose-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+            type="button"
+            onClick={() => setActiveLayer('demand')}
+            className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+              activeLayer === 'demand' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Critical (90+)
+            Citizen Demand
           </button>
           <button
-            onClick={() => setActiveLayer('roads')}
-            className={`px-2.5 py-1 rounded transition-all ${
-              activeLayer === 'roads' ? 'bg-blue-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+            type="button"
+            onClick={() => setActiveLayer('deficit')}
+            className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+              activeLayer === 'deficit' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Roads
-          </button>
-          <button
-            onClick={() => setActiveLayer('water')}
-            className={`px-2.5 py-1 rounded transition-all ${
-              activeLayer === 'water' ? 'bg-sky-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Water
+            Infra Deficit
           </button>
         </div>
       </div>
 
-      {/* Map Content + Side District Diagnostics Drawer */}
-      <div className="flex-1 relative flex overflow-hidden">
-        {/* Leaflet Map Div */}
-        <div ref={mapContainerRef} className="flex-1 w-full h-full" />
+      {/* Main Grid: Map (8 cols) + Contextual Diagnostics Drawer (4 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 relative min-h-[460px]">
+        {/* Leaflet Geospatial Map Container */}
+        <div className="lg:col-span-8 h-[420px] lg:h-[500px] w-full z-10 relative">
+          <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#f8fafc' }} />
 
-        {/* Selected Hotspot Diagnostics Drawer */}
-        {selectedHotspot && (
-          <div className="w-80 bg-white/95 backdrop-blur-xs border-l border-slate-200 p-5 shadow-lg overflow-y-auto flex flex-col justify-between absolute right-0 top-0 bottom-0 z-20 animate-fadeIn">
+          {/* Map Legend Overlay */}
+          <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-xs p-2.5 rounded-lg border border-slate-200 shadow-sm z-20 text-[11px] space-y-1">
+            <span className="font-bold text-slate-700 block uppercase tracking-wider text-[10px]">Priority Severity</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                <span className="text-slate-600">Critical (&gt;85)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
+                <span className="text-slate-600">High (70-85)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                <span className="text-slate-600">Medium</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Contextual Region Diagnostics Side Drawer (4 cols) */}
+        <div className="lg:col-span-4 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-5 flex flex-col justify-between space-y-4">
+          {selectedPoint ? (
             <div className="space-y-4">
-              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              {/* Drawer Top */}
+              <div className="flex items-start justify-between border-b border-slate-200 pb-3">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base">
-                    {selectedHotspot.district}
-                  </h3>
-                  <div className="text-xs text-slate-500">{selectedHotspot.state}, {selectedHotspot.country}</div>
+                  <span className="text-[10px] font-mono text-slate-400 block uppercase tracking-wider">
+                    Region Diagnostic Panel
+                  </span>
+                  <h4 className="text-lg font-bold text-slate-900">{selectedPoint.district} Region</h4>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {selectedPoint.state}, {selectedPoint.country}
+                  </span>
                 </div>
-                <PriorityBadge level={selectedHotspot.priority_level} score={selectedHotspot.composite_priority_score} size="sm" />
+                <PriorityBadge level={selectedPoint.priority_level} score={selectedPoint.composite_priority_score} size="sm" />
               </div>
 
-              {/* Core Metrics */}
+              {/* Key Diagnostic Indicators */}
               <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-500 block uppercase font-medium">Citizen Demand</span>
-                  <span className="font-bold text-slate-900 font-mono text-sm">
-                    {selectedHotspot.request_count} Requests
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Citizen Requests</span>
+                  <span className="font-extrabold text-slate-900 font-mono text-base block mt-0.5">
+                    {selectedPoint.request_count.toLocaleString()}
                   </span>
+                  <span className="text-[10px] text-slate-500">Verified signals</span>
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-500 block uppercase font-medium">Infra Deficit</span>
-                  <span className="font-bold text-rose-700 font-mono text-sm">
-                    {selectedHotspot.infrastructure_deficit_index.toFixed(0)}/100
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Affected Reach</span>
+                  <span className="font-extrabold text-slate-900 font-mono text-base block mt-0.5">
+                    ~{selectedPoint.affected_population.toLocaleString()}
                   </span>
+                  <span className="text-[10px] text-slate-500">Residents impacted</span>
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-500 block uppercase font-medium">Affected Pop</span>
-                  <span className="font-bold text-slate-900 font-mono text-sm">
-                    {selectedHotspot.affected_population.toLocaleString()}
-                  </span>
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Primary Need Sector</span>
+                  <div className="mt-1">
+                    <CategoryBadge category={selectedPoint.top_category} />
+                  </div>
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-500 block uppercase font-medium">Matching Projects</span>
-                  <span className={`font-bold font-mono text-sm ${selectedHotspot.active_projects_count === 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                    {selectedHotspot.active_projects_count} Active
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Infra Deficit Index</span>
+                  <span className="font-extrabold text-rose-600 font-mono text-base block mt-0.5">
+                    {selectedPoint.infrastructure_deficit_index.toFixed(0)}/100
                   </span>
+                  <span className="text-[10px] text-slate-500">Capacity gap</span>
                 </div>
               </div>
 
-              {/* Top Issue Category */}
-              <div>
-                <span className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">
-                  Dominant Demand Area
-                </span>
-                <CategoryBadge category={selectedHotspot.top_category} />
-              </div>
-
-              {/* AI Diagnostic Summary */}
-              <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-100 text-xs">
-                <div className="flex items-center gap-1.5 text-blue-900 font-bold mb-1">
-                  <Info className="w-3.5 h-3.5 text-blue-600" />
-                  <span>AI Diagnostic Overview:</span>
+              {/* Diagnostic Assessment Text */}
+              <div className="bg-white p-3.5 rounded-lg border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Planning Evidence Summary</span>
                 </div>
-                <p className="text-slate-700 leading-relaxed text-[11px]">
-                  High concentration of citizen submissions identifies severe {selectedHotspot.top_category.toLowerCase()} deficit. 
-                  {selectedHotspot.active_projects_count === 0 ? ' No active matching government public work is currently addressing this corridor.' : ' Current works require fast-tracking.'}
+                <p className="text-slate-600 text-[11px] leading-relaxed font-normal">
+                  High citizen demand intensity overlaps with a measured infrastructure deficit of {selectedPoint.infrastructure_deficit_index.toFixed(0)}/100 in the {selectedPoint.top_category} sector. {selectedPoint.active_projects_count === 0 ? 'No matching active public works currently address this deficit.' : `Currently ${selectedPoint.active_projects_count} matching works in progress.`}
                 </p>
               </div>
-            </div>
 
-            {/* Action to Open Full Recommendation */}
-            <div className="pt-4 border-t border-slate-100 space-y-2">
-              <button
-                onClick={() => handleOpenRecDetail(selectedHotspot.district)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all"
-              >
-                <span>View Full AI Recommendation</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setSelectedHotspot(null)}
-                className="w-full py-1.5 text-center text-xs text-slate-500 hover:text-slate-800"
-              >
-                Close Drawer
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenRec(selectedPoint.district)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                >
+                  <FileCheck2 className="w-3.5 h-3.5" />
+                  <span>View Detailed Policy Analysis</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-auto" />
+                </button>
 
-      {/* Map Footer Legend */}
-      <div className="px-5 py-2.5 border-t border-slate-200 bg-slate-50/90 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4 text-[11px]">
-          <span className="font-semibold text-slate-700 uppercase tracking-wider">Legend:</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-rose-600" />
-            <span>Critical Priority (Score 85+)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-600" />
-            <span>High Priority (75-84)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-blue-600" />
-            <span>Medium Priority (60-74)</span>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => handleInspectRequests(selectedPoint.district)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Inspect Underlying Citizen Signals</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400 space-y-2">
+              <MapPin className="w-8 h-8 text-slate-300" />
+              <span className="text-xs font-medium">Click on any cluster on the map to inspect regional diagnostics</span>
+            </div>
+          )}
         </div>
-        <span className="text-[11px] text-slate-400 font-mono">
-          Click any hotspot marker to inspect live district diagnostics
-        </span>
       </div>
     </div>
   );

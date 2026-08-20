@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const InsightsView: React.FC = () => {
-  const { insights, selectedCountry, setAuthoritySubTab, setSelectedDistrict } = useApp();
+  const { insights, selectedCountry, setAuthoritySubTab, setSelectedDistrict, setSelectedCategory } = useApp();
 
   const [selectedType, setSelectedType] = useState<string>('All');
 
@@ -23,6 +23,11 @@ export const InsightsView: React.FC = () => {
     if (selectedType !== 'All' && item.insight_type !== selectedType) return false;
     return true;
   });
+
+  const handleExamineOnMap = (category: string) => {
+    setSelectedCategory(category);
+    setAuthoritySubTab('map');
+  };
 
   return (
     <div className="space-y-6">
@@ -51,8 +56,8 @@ export const InsightsView: React.FC = () => {
             <button
               key={t}
               onClick={() => setSelectedType(t)}
-              className={`px-3 py-1.5 rounded transition-all ${
-                selectedType === t ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer ${
+                selectedType === t ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {t === 'All' ? 'All Insights' : t}
@@ -124,10 +129,8 @@ export const InsightsView: React.FC = () => {
                   Sector: <span className="font-semibold text-slate-800">{insight.category}</span>
                 </span>
                 <button
-                  onClick={() => {
-                    setAuthoritySubTab('map');
-                  }}
-                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold"
+                  onClick={() => handleExamineOnMap(insight.category)}
+                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
                 >
                   <span>Examine on Demand Map</span>
                   <ArrowRight className="w-3.5 h-3.5" />

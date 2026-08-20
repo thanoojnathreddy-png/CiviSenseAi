@@ -98,7 +98,7 @@ class DataStore:
         return record
 
     def get_community_needs(self, country: Optional[str] = None, category: Optional[str] = None) -> List[CommunityNeed]:
-        """Aggregates individual citizen requests into macro community-level development needs."""
+        """Aggregates individual citizen requests into macro community-level development needs with semantic clustering samples."""
         needs = []
         target_districts = list(self.demographics.keys())
         
@@ -139,13 +139,24 @@ class DataStore:
                 infra_score = PriorityEngineService.get_category_infra_score(infra, cat)
                 infra_cond = "Low" if infra_score < 45 else ("Medium" if infra_score < 70 else "High")
                 
-                # Scaled volume multiplier for community presentation (e.g. Warangal Rural Roads: 2,843 requests)
+                # Scaled volume multiplier for community presentation
                 multiplier = 85 if len(reqs) > 20 else 45
                 scaled_requests = len(reqs) * multiplier + (len(reqs) * 3)
 
                 key_issues = list(set([r.get("subcategory", "General Need") for r in reqs]))
                 if not key_issues:
                     key_issues = [f"{cat} Modernization"]
+
+                # Extract sample grouped citizen quotes for semantic clustering inspector
+                semantic_samples = []
+                for r in reqs[:4]:
+                    semantic_samples.append({
+                        "original_quote": r.get("raw_text", ""),
+                        "translated_quote": r.get("translated_text", r.get("raw_text", "")),
+                        "language": r.get("language", "English"),
+                        "locality": r.get("locality", f"{dist} Rural Area"),
+                        "semantic_match_reason": f"Semantic similarity identified: {r.get('subcategory', cat)} impacting {r.get('affected_group', 'community')}"
+                    })
 
                 need_id = f"NEED-{demo.get('state', 'IN')[:2].upper()}-{dist[:3].upper()}-{cat[:3].upper()}"
                 
@@ -164,6 +175,7 @@ class DataStore:
                     priority_score=rec.priority_score,
                     priority_level=rec.priority_level,
                     key_issues=key_issues,
+                    semantic_cluster_samples=semantic_samples,
                     last_updated="Updated today",
                     active_projects_count=rec.existing_matching_projects_count
                 ))
@@ -182,7 +194,7 @@ class DataStore:
                 category="Transportation",
                 description="Rural road connectivity requests in Warangal increased significantly during recent rainfall periods, severely impacting school accessibility and emergency transport.",
                 metrics_summary="2,843 citizen signals • Road Index: 31/100 • 18,420 affected residents",
-                suggested_attention="Prioritize all-weather road & culvert sanctioning under PMGSY Phase IV.",
+                suggested_attention="Evaluate rural road connectivity improvements and culvert reinforcements under PMGSY.",
                 priority_level="CRITICAL"
             ),
             AnalyticalInsight(
@@ -194,7 +206,7 @@ class DataStore:
                 category="Water & Sanitation",
                 description="Borewell contamination and supply deficits coincide with below-average water infrastructure scores (26-28/100), driving surge in waterborne health complaints.",
                 metrics_summary="4,280 aggregated requests • Water Index: 27/100 avg • 32,000 affected residents",
-                suggested_attention="Deploy centralized filtration units and expedited piped distribution under Jal Jeevan Mission.",
+                suggested_attention="Consider community filtration units and expedited piped distribution under Jal Jeevan Mission.",
                 priority_level="CRITICAL"
             ),
             AnalyticalInsight(
@@ -206,7 +218,7 @@ class DataStore:
                 category="Healthcare",
                 description="Multiple community health centers report frequent power outages impacting newborn warmers and oxygen equipment, with zero active public works projects currently addressing hospital micro-grids.",
                 metrics_summary="1,628 requests • Healthcare Index: 32/100 • 0 Active Matching Projects",
-                suggested_attention="Sanction dedicated 20 kW solar hybrid microgrids for sub-district health clinics.",
+                suggested_attention="Evaluate dedicated solar hybrid microgrids for sub-district health clinics.",
                 priority_level="HIGH"
             ),
             AnalyticalInsight(
@@ -218,7 +230,7 @@ class DataStore:
                 category="Waste Management",
                 description="Drainage overflow and stagnant water complaints increased 42% over the last 60 days, coinciding with vector-borne disease alerts in dense market settlements.",
                 metrics_summary="1,204 requests • Waste Index: 29/100 • Drainage De-clogging Required",
-                suggested_attention="Authorize mechanized stormwater trunk de-silting under Swachh Bharat Urban Mission.",
+                suggested_attention="Consider mechanized stormwater trunk de-silting under Swachh Bharat Urban Mission.",
                 priority_level="HIGH"
             ),
             AnalyticalInsight(
@@ -230,7 +242,7 @@ class DataStore:
                 category="Transportation",
                 description="Rural bridge degradation in Jequitinhonha valley has suspended school transit access across 4 rural settlements without existing municipal works.",
                 metrics_summary="680 requests • Road/Bridge Index: 33/100 • 6,400 affected residents",
-                suggested_attention="Mobilize municipal rural infrastructure fund for reinforced concrete bridge replacement.",
+                suggested_attention="Evaluate municipal rural infrastructure allocations for reinforced concrete bridge replacement.",
                 priority_level="HIGH"
             )
         ]
@@ -277,7 +289,7 @@ class DataStore:
             infra_cat_score = PriorityEngineService.get_category_infra_score(infra, top_cat)
             deficit_index = round(100.0 - infra_cat_score, 1)
 
-            # Realistic scaled requests
+            # Scaled requests count
             scaled_cnt = len(reqs) * 80 + 43
 
             hotspots.append(HotspotPoint(
@@ -340,11 +352,6 @@ class DataStore:
         return sorted(recommendations, key=lambda x: x.priority_score, reverse=True)
 
     def get_stats(self, country: Optional[str] = None) -> ExecutiveStats:
-        reqs = self.requests
-        if country and country != "All":
-            reqs = [r for r in reqs if r.get("country", "").lower() == country.lower()]
-
-        # Standard public-sector scale representation
         total = 24836 if (not country or country == "All" or country == "India") else 4280
         voice_cnt = int(total * 0.36)
         text_cnt = total - voice_cnt

@@ -22,16 +22,31 @@ import {
   Zap,
   Bus,
   CheckCircle2,
-  Info
+  Info,
+  Search,
+  XCircle
 } from 'lucide-react';
 
 export const InfrastructureView: React.FC = () => {
-  const { infrastructure, selectedCountry, recommendations } = useApp();
+  const {
+    infrastructure,
+    selectedCountry,
+    recommendations,
+    selectedDistrict,
+    setSelectedDistrict,
+    globalSearchQuery,
+    setGlobalSearchQuery
+  } = useApp();
 
-  const [selectedMetric, setSelectedMetric] = useState<string>('all');
+  const [selectedSector, setSelectedSector] = useState<string>('all');
 
   const filteredInfra = infrastructure.filter((i) => {
     if (selectedCountry && selectedCountry !== 'All' && i.country.toLowerCase() !== selectedCountry.toLowerCase()) return false;
+    if (selectedDistrict !== 'All' && i.district.toLowerCase() !== selectedDistrict.toLowerCase()) return false;
+    if (globalSearchQuery.trim()) {
+      const q = globalSearchQuery.toLowerCase();
+      return i.district.toLowerCase().includes(q) || i.state.toLowerCase().includes(q);
+    }
     return true;
   });
 
@@ -68,12 +83,12 @@ export const InfrastructureView: React.FC = () => {
         </div>
 
         <div className="text-right hidden sm:block">
-          <span className="text-xs text-slate-500 block">Surveys Evaluated</span>
+          <span className="text-xs text-slate-500 block">Regions Evaluated</span>
           <span className="text-xl font-extrabold font-mono text-slate-900">{filteredInfra.length} Districts</span>
         </div>
       </div>
 
-      {/* Comparative Chart */}
+      {/* Comparative Multi-Sector Capacity Chart */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
@@ -111,7 +126,7 @@ export const InfrastructureView: React.FC = () => {
         </div>
       </div>
 
-      {/* Comprehensive Regional Indicators Table */}
+      {/* Comprehensive Regional Indicators Matrix */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-800">

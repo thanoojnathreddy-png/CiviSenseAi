@@ -12,31 +12,31 @@ import {
   AlertTriangle,
   ArrowRight,
   Search,
-  Filter
+  Filter,
+  Layers,
+  XCircle
 } from 'lucide-react';
 
 export const ProjectsView: React.FC = () => {
-  const { governmentProjects, selectedCountry, setAuthoritySubTab } = useApp();
+  const {
+    filteredProjects,
+    selectedCountry,
+    selectedCategory,
+    setSelectedCategory,
+    selectedDistrict,
+    setSelectedDistrict,
+    globalSearchQuery,
+    setGlobalSearchQuery,
+    hasActiveFilters,
+    resetAllFilters,
+    demographics,
+    setAuthoritySubTab
+  } = useApp();
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const filteredProjects = governmentProjects.filter((p) => {
-    if (selectedCountry && selectedCountry !== 'All' && p.country.toLowerCase() !== selectedCountry.toLowerCase()) return false;
+  const displayedProjects = filteredProjects.filter((p) => {
     if (selectedStatus !== 'All' && p.status.toLowerCase() !== selectedStatus.toLowerCase()) return false;
-    if (selectedCategory !== 'All' && p.category.toLowerCase() !== selectedCategory.toLowerCase()) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        p.title.toLowerCase().includes(q) ||
-        p.district.toLowerCase().includes(q) ||
-        p.implementing_agency.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-      );
-    }
-
     return true;
   });
 
@@ -63,7 +63,7 @@ export const ProjectsView: React.FC = () => {
 
         <div className="text-right hidden sm:block">
           <span className="text-xs text-slate-500 block">Active Projects Monitored</span>
-          <span className="text-xl font-extrabold font-mono text-slate-900">{filteredProjects.length} Public Works</span>
+          <span className="text-xl font-extrabold font-mono text-slate-900">{displayedProjects.length} Public Works</span>
         </div>
       </div>
 
@@ -74,8 +74,8 @@ export const ProjectsView: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={globalSearchQuery}
+              onChange={(e) => setGlobalSearchQuery(e.target.value)}
               placeholder="Search project title, agency, or district..."
               className="w-full text-xs pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
             />
@@ -95,33 +95,43 @@ export const ProjectsView: React.FC = () => {
             </select>
           </div>
 
-          <div>
+          <div className="flex items-center gap-2">
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Categories</option>
+              <option value="All">All Sectors</option>
               <option value="Transportation">Transportation</option>
               <option value="Water & Sanitation">Water & Sanitation</option>
               <option value="Healthcare">Healthcare</option>
               <option value="Education">Education</option>
               <option value="Power & Energy">Power & Energy</option>
             </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={resetAllFilters}
+                title="Reset Filters"
+                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Projects Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {filteredProjects.map((proj) => {
+        {displayedProjects.map((proj) => {
           let statusBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
           if (proj.status === 'Completed') statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
           else if (proj.status === 'In Progress') statusBadgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
           else if (proj.status === 'Delayed') statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
 
           return (
-            <div key={proj.project_id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4 flex flex-col justify-between">
+            <div key={proj.project_id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4 flex flex-col justify-between hover:border-slate-300 transition-all">
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -174,7 +184,7 @@ export const ProjectsView: React.FC = () => {
                   <span className="text-[10px] text-slate-400 block">residents</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Target Target</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Target Date</span>
                   <span className="font-bold text-slate-900 font-mono text-xs">{proj.target_completion_date}</span>
                 </div>
               </div>

@@ -12,6 +12,8 @@ export type AuthoritySubTab =
   | 'insights'
   | 'explorer';
 
+export type TimePeriodFilter = 'all' | 'last_30_days' | 'last_90_days' | 'last_year';
+
 export interface ScoreFactorBreakdown {
   citizen_demand_score: number;
   citizen_demand_weight: number;
@@ -70,6 +72,14 @@ export interface AIPriorityRecommendation {
   status: string;
 }
 
+export interface SemanticClusterSample {
+  original_quote: string;
+  translated_quote: string;
+  language: string;
+  locality: string;
+  semantic_match_reason: string;
+}
+
 export interface CommunityNeed {
   need_id: string;
   title: string;
@@ -85,6 +95,7 @@ export interface CommunityNeed {
   priority_score: number;
   priority_level: PriorityLevel;
   key_issues: string[];
+  semantic_cluster_samples?: SemanticClusterSample[];
   last_updated: string;
   active_projects_count: number;
 }
