@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const RequestExplorer: React.FC = () => {
-  const { requests, selectedCountry } = useApp();
+  const { requests, selectedCountry, regions, demographics } = useApp();
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
@@ -172,14 +172,11 @@ export const RequestExplorer: React.FC = () => {
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer font-medium"
             >
               <option value="All">All Districts</option>
-              <option value="Warangal">Warangal (Telangana)</option>
-              <option value="Adilabad">Adilabad (Telangana)</option>
-              <option value="Anantapur">Anantapur (AP)</option>
-              <option value="Kurnool">Kurnool (AP)</option>
-              <option value="Yavatmal">Yavatmal (Maharashtra)</option>
-              <option value="Varanasi Rural">Varanasi Rural (UP)</option>
-              <option value="Jequitinhonha">Jequitinhonha (Brazil)</option>
-              <option value="Vhembe">Vhembe (South Africa)</option>
+              {(regions.length > 0 ? regions : demographics).map((r) => (
+                <option key={r.district} value={r.district}>
+                  {r.district} ({r.state})
+                </option>
+              ))}
             </select>
           </div>
         </div>

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { VoiceRecorder } from './VoiceRecorder';
 import { LiveAIExtractor } from './LiveAIExtractor';
 import { apiService } from '../../services/api';
-import { AIStructuredExtraction } from '../../types';
+import { AIStructuredExtraction, RegionOption } from '../../types';
 import {
   Send,
   CheckCircle2,
@@ -21,44 +21,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// District to Locality & Mandal Mapping for Dynamic Suggestions
-const DISTRICT_LOCALITY_MAP: Record<string, { mandals: string[]; defaultPlaceholder: string }> = {
-  Warangal: {
-    mandals: ['Chennaraopet Mandal', 'Narsampet', 'Wardhanna Pet', 'Geesugonda', 'Duggondi'],
-    defaultPlaceholder: 'e.g. Chennaraopet Mandal, Narsampet, Ward 4'
-  },
-  Adilabad: {
-    mandals: ['Utnoor Mandal', 'Asifabad Habitation', 'Indervelli', 'Jainoor', 'Bazarhatnoor'],
-    defaultPlaceholder: 'e.g. Utnoor Mandal, Asifabad, Tribal Habitation 3'
-  },
-  Anantapur: {
-    mandals: ['Kalyanadurg Mandal', 'Dharmavaram', 'Rayadurg', 'Guntakal', 'Kadiri'],
-    defaultPlaceholder: 'e.g. Kalyanadurg Mandal, Dharmavaram, Ward 2'
-  },
-  Kurnool: {
-    mandals: ['Adoni Municipality', 'Yemmiganur', 'Nandyal Road Ward 4', 'Dhone Block', 'Alur'],
-    defaultPlaceholder: 'e.g. Adoni, Yemmiganur, Old City Ward 11'
-  },
-  Yavatmal: {
-    mandals: ['Ghatanji Taluka', 'Pusad Rural', 'Umarkhed', 'Kelapur', 'Wani'],
-    defaultPlaceholder: 'e.g. Ghatanji Taluka, Pusad, Gram Panchayat 6'
-  },
-  'Varanasi Rural': {
-    mandals: ['Pindra Block', 'Cholapur Village', 'Arajiline Sector', 'Kashi Vidyapeeth', 'Sewapuri'],
-    defaultPlaceholder: 'e.g. Pindra Block, Cholapur, Village Sector 2'
-  },
-  Jequitinhonha: {
-    mandals: ['Comunidade Rural São Pedro', 'Bairro Centro', 'Vale do Jequitinhonha', 'Distrito Norte'],
-    defaultPlaceholder: 'e.g. Comunidade Rural, Bairro Centro, Setor 1'
-  },
-  Vhembe: {
-    mandals: ['Thohoyandou Ward 12', 'Makhado Rural Village', 'Musina Sector 3', 'Collins Chabane Area'],
-    defaultPlaceholder: 'e.g. Thohoyandou Ward 12, Makhado Village'
-  }
-};
-
 export const CitizenPortal: React.FC = () => {
-  const { setMainTab, setAuthoritySubTab, refreshData, setLiveNotification } = useApp();
+  const { regions, isLoading, setMainTab, setAuthoritySubTab, refreshData, setLiveNotification } = useApp();
 
   const [language, setLanguage] = useState<string>('Telugu');
   const [district, setDistrict] = useState<string>('');
@@ -76,6 +40,23 @@ export const CitizenPortal: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<any | null>(null);
+
+  // Dynamically group backend regions by Country / State
+  const groupedRegions = useMemo(() => {
+    const groups: Record<string, RegionOption[]> = {};
+    regions.forEach((r) => {
+      const groupKey = r.country === 'India' ? `India - ${r.state}` : `${r.country} (${r.state})`;
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(r);
+    });
+    return groups;
+  }, [regions]);
+
+  const selectedRegionObj = useMemo(() => {
+    return regions.find((r) => r.district.toLowerCase() === district.toLowerCase());
+  }, [regions, district]);
 
   // Sample prompts
   const samplePrompts: Record<string, Array<{ label: string; text: string }>> = {
@@ -197,27 +178,11 @@ export const CitizenPortal: React.FC = () => {
   const handleFinalConfirmSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const stateMap: Record<string, string> = {
-        Warangal: 'Telangana',
-        Adilabad: 'Telangana',
-        Anantapur: 'Andhra Pradesh',
-        Kurnool: 'Andhra Pradesh',
-        Yavatmal: 'Maharashtra',
-        'Varanasi Rural': 'Uttar Pradesh',
-        Jequitinhonha: 'Minas Gerais',
-        Vhembe: 'Limpopo'
-      };
-
-      const countryMap: Record<string, string> = {
-        Jequitinhonha: 'Brazil',
-        Vhembe: 'South Africa'
-      };
-
       const res = await apiService.submitRequest({
         text: inputText,
         language: language,
-        country: countryMap[district] || 'India',
-        state: stateMap[district] || 'Telangana',
+        country: selectedRegionObj?.country || 'India',
+        state: selectedRegionObj?.state || 'Telangana',
         district: district,
         locality: locality || `${district} Sector`,
         is_voice: isVoiceSubmitted
@@ -516,7 +481,6 @@ export const CitizenPortal: React.FC = () => {
                 </div>
 
                 {/* District Picker */}
-                {/* District Picker */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
@@ -531,8 +495,9 @@ export const CitizenPortal: React.FC = () => {
                       const selected = e.target.value;
                       setDistrict(selected);
                       setLocationError(null);
-                      if (selected && DISTRICT_LOCALITY_MAP[selected]) {
-                        setLocality(DISTRICT_LOCALITY_MAP[selected].mandals[0]);
+                      const matched = regions.find((r) => r.district.toLowerCase() === selected.toLowerCase());
+                      if (matched && matched.localities && matched.localities.length > 0) {
+                        setLocality(matched.localities[0]);
                       } else {
                         setLocality('');
                       }
@@ -541,23 +506,18 @@ export const CitizenPortal: React.FC = () => {
                       locationError ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-300' : 'border-slate-300'
                     }`}
                   >
-                    <option value="" disabled>Select District / Administrative Region</option>
-                    <optgroup label="India - Telangana">
-                      <option value="Warangal">Warangal (Rural Roads Focus)</option>
-                      <option value="Adilabad">Adilabad (Water & Healthcare Focus)</option>
-                    </optgroup>
-                    <optgroup label="India - Andhra Pradesh">
-                      <option value="Anantapur">Anantapur (Healthcare Power Focus)</option>
-                      <option value="Kurnool">Kurnool (Drainage & Waste Focus)</option>
-                    </optgroup>
-                    <optgroup label="India - Maharashtra & UP">
-                      <option value="Yavatmal">Yavatmal (Water Supply Focus)</option>
-                      <option value="Varanasi Rural">Varanasi Rural (School Infrastructure)</option>
-                    </optgroup>
-                    <optgroup label="BRICS Partner Regions">
-                      <option value="Jequitinhonha">Jequitinhonha (Minas Gerais, Brazil)</option>
-                      <option value="Vhembe">Vhembe (Limpopo, South Africa)</option>
-                    </optgroup>
+                    <option value="" disabled>
+                      {regions.length === 0 ? 'Loading available regions from backend...' : 'Select District / Administrative Region'}
+                    </option>
+                    {Object.entries(groupedRegions).map(([groupLabel, districtList]) => (
+                      <optgroup key={groupLabel} label={groupLabel}>
+                        {districtList.map((r) => (
+                          <option key={r.district} value={r.district}>
+                            {r.district} {r.focus_area ? `(${r.focus_area})` : `(${r.state})`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                   {locationError && (
                     <p className="text-[11px] text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
@@ -665,24 +625,24 @@ export const CitizenPortal: React.FC = () => {
                   value={locality}
                   onChange={(e) => setLocality(e.target.value)}
                   placeholder={
-                    district && DISTRICT_LOCALITY_MAP[district]
-                      ? DISTRICT_LOCALITY_MAP[district].defaultPlaceholder
+                    selectedRegionObj && selectedRegionObj.localities && selectedRegionObj.localities.length > 0
+                      ? `e.g. ${selectedRegionObj.localities.slice(0, 2).join(', ')}, Ward 4`
                       : 'Select District / Administrative Region first...'
                   }
                   disabled={!district}
                   className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden disabled:opacity-60 disabled:cursor-not-allowed"
                 />
-                {district && DISTRICT_LOCALITY_MAP[district] && (
+                {selectedRegionObj && selectedRegionObj.localities && selectedRegionObj.localities.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
                     <span className="text-[10px] text-slate-400 font-semibold">Suggested areas:</span>
-                    {DISTRICT_LOCALITY_MAP[district].mandals.map((mandal) => (
+                    {selectedRegionObj.localities.map((mandal) => (
                       <button
                         key={mandal}
                         type="button"
                         onClick={() => setLocality(mandal)}
                         className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
                           locality === mandal
-                            ? 'bg-blue-100 text-blue-800 border-blue-300 font-semibold'
+                            ? 'bg-blue-100 text-blue-800 border-blue-300 font-semibold shadow-2xs'
                             : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 hover:text-slate-800'
                         }`}
                       >

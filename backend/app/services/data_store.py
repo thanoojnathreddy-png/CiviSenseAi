@@ -24,6 +24,47 @@ class DataStore:
         self.requests: List[Dict[str, Any]] = generate_full_synthetic_requests()
         self._request_counter = len(self.requests) + 1000
 
+    def get_regions(self, country: Optional[str] = None) -> List[Dict[str, Any]]:
+        LOCALITIES_MAP = {
+            "Warangal": ["Chennaraopet Mandal", "Narsampet", "Wardhanna Pet", "Geesugonda", "Duggondi"],
+            "Adilabad": ["Utnoor Mandal", "Asifabad Habitation", "Indervelli", "Jainoor", "Bazarhatnoor"],
+            "Anantapur": ["Kalyanadurg Mandal", "Dharmavaram", "Rayadurg", "Guntakal", "Kadiri"],
+            "Kurnool": ["Adoni Municipality", "Yemmiganur", "Nandyal Road Ward 4", "Dhone Block", "Alur"],
+            "Yavatmal": ["Ghatanji Taluka", "Pusad Rural", "Umarkhed", "Kelapur", "Wani"],
+            "Varanasi Rural": ["Pindra Block", "Cholapur Village", "Arajiline Sector", "Kashi Vidyapeeth", "Sewapuri"],
+            "Jequitinhonha": ["Comunidade Rural São Pedro", "Bairro Centro", "Vale do Jequitinhonha", "Distrito Norte"],
+            "Vhembe": ["Thohoyandou Ward 12", "Makhado Rural Village", "Musina Sector 3", "Collins Chabane Area"]
+        }
+        
+        FOCUS_MAP = {
+            "Warangal": "Rural Roads & Connectivity",
+            "Adilabad": "Water & Healthcare Access",
+            "Anantapur": "Healthcare & Power Continuity",
+            "Kurnool": "Drainage & Waste Management",
+            "Yavatmal": "Drinking Water Supply",
+            "Varanasi Rural": "School & Educational Facilities",
+            "Jequitinhonha": "Rural Bridge & Road Infrastructure",
+            "Vhembe": "Water & Energy Access"
+        }
+        
+        regions = []
+        for d in self.demographics.values():
+            if country and country != "All" and d.get("country", "").lower() != country.lower():
+                continue
+            dist = d.get("district", "")
+            regions.append({
+                "region_id": d.get("region_id", ""),
+                "district": dist,
+                "state": d.get("state", ""),
+                "country": d.get("country", "India"),
+                "population": d.get("population", 0),
+                "latitude": d.get("latitude", 0.0),
+                "longitude": d.get("longitude", 0.0),
+                "focus_area": FOCUS_MAP.get(dist, "Infrastructure Planning"),
+                "localities": LOCALITIES_MAP.get(dist, [f"{dist} Sector 1", f"{dist} Sector 2", f"{dist} Central"])
+            })
+        return regions
+
     def get_all_requests(
         self,
         country: Optional[str] = None,

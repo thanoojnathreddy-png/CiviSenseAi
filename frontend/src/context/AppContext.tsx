@@ -12,7 +12,8 @@ import {
   InfrastructureIndex,
   GovernmentProject,
   CommunityNeed,
-  AnalyticalInsight
+  AnalyticalInsight,
+  RegionOption
 } from '../types';
 import { apiService } from '../services/api';
 
@@ -54,6 +55,8 @@ interface AppContextType {
   infrastructure: InfrastructureIndex[];
   governmentProjects: GovernmentProject[];
   requests: CitizenRequestRecord[];
+  regions: RegionOption[];
+  availableCountries: string[];
   
   // Filtered Computed Data
   filteredCommunityNeeds: CommunityNeed[];
@@ -103,6 +106,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [infrastructure, setInfrastructure] = useState<InfrastructureIndex[]>([]);
   const [governmentProjects, setGovernmentProjects] = useState<GovernmentProject[]>([]);
   const [requests, setRequests] = useState<CitizenRequestRecord[]>([]);
+  const [regions, setRegions] = useState<RegionOption[]>([]);
   
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [liveNotification, setLiveNotification] = useState<{ message: string; type?: 'info' | 'success' | 'warning' } | null>(null);
@@ -119,7 +123,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         demosData,
         infraData,
         projectsData,
-        requestsData
+        requestsData,
+        regionsData
       ] = await Promise.all([
         apiService.getStats(selectedCountry),
         apiService.getCommunityNeeds(selectedCountry),
@@ -129,7 +134,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         apiService.getDemographics(selectedCountry),
         apiService.getInfrastructure(selectedCountry),
         apiService.getGovernmentProjects(selectedCountry),
-        apiService.getRequests({ country: selectedCountry, limit: 200 })
+        apiService.getRequests({ country: selectedCountry, limit: 200 }),
+        apiService.getRegions()
       ]);
 
       setStats(statsData);
@@ -141,12 +147,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setInfrastructure(infraData);
       setGovernmentProjects(projectsData);
       setRequests(requestsData);
+      setRegions(regionsData);
     } catch (err) {
       console.error('Error refreshing platform data:', err);
     } finally {
       setIsLoading(false);
     }
   }, [selectedCountry]);
+
+  // Derived Dynamic Countries List
+  const availableCountries = useMemo(() => {
+    const cSet = new Set<string>();
+    regions.forEach((r) => {
+      if (r.country) cSet.add(r.country);
+    });
+    if (cSet.size === 0) {
+      return ['India', 'Brazil', 'South Africa'];
+    }
+    return Array.from(cSet);
+  }, [regions]);
 
   useEffect(() => {
     refreshData();
@@ -330,6 +349,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         infrastructure,
         governmentProjects,
         requests,
+        regions,
+        availableCountries,
         filteredCommunityNeeds,
         filteredHotspots,
         filteredRecommendations,

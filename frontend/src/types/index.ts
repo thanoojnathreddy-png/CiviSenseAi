@@ -187,6 +187,18 @@ export interface AIStructuredExtraction {
   sentiment_score: number;
 }
 
+export interface RegionOption {
+  region_id: string;
+  district: string;
+  state: string;
+  country: string;
+  population?: number;
+  latitude?: number;
+  longitude?: number;
+  focus_area?: string;
+  localities?: string[];
+}
+
 export interface Demographics {
   country: string;
   state: string;

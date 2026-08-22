@@ -25,6 +25,7 @@ export const Navbar: React.FC = () => {
     setAuthoritySubTab,
     selectedCountry,
     setSelectedCountry,
+    availableCountries,
     isLoading
   } = useApp();
 
@@ -57,42 +58,42 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Center Main Role Navigation */}
-          <nav className="flex items-center bg-slate-800/90 p-1 rounded-lg border border-slate-700/80 text-xs font-medium">
+          {/* Navigation Tabs */}
+          <nav className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => setMainTab('home')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 mainTab === 'home'
                   ? 'bg-blue-600 text-white shadow-sm font-semibold'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <Home className="w-3.5 h-3.5" />
-              <span>Public Home</span>
+              <span className="hidden md:inline">Public Portal</span>
             </button>
 
             <button
               onClick={() => setMainTab('citizen')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 mainTab === 'citizen'
                   ? 'bg-blue-600 text-white shadow-sm font-semibold'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <MessageSquarePlus className="w-3.5 h-3.5" />
-              <span>Citizen Portal</span>
+              <span>Share a Need</span>
             </button>
 
             <button
               onClick={() => setMainTab('authority')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 mainTab === 'authority'
                   ? 'bg-blue-600 text-white shadow-sm font-semibold'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Public Authority Portal</span>
+              <span>Authority Portal</span>
             </button>
           </nav>
 
@@ -105,9 +106,14 @@ export const Navbar: React.FC = () => {
                 onChange={(e) => setSelectedCountry(e.target.value)}
                 className="bg-transparent text-slate-200 text-xs font-medium focus:outline-hidden cursor-pointer"
               >
-                <option value="India" className="bg-slate-900 text-white">🇮🇳 India</option>
-                <option value="Brazil" className="bg-slate-900 text-white">🇧🇷 Brazil</option>
-                <option value="South Africa" className="bg-slate-900 text-white">🇿🇦 South Africa</option>
+                {availableCountries.map((c) => {
+                  const flag = c === 'India' ? '🇮🇳 ' : c === 'Brazil' ? '🇧🇷 ' : c === 'South Africa' ? '🇿🇦 ' : '🌐 ';
+                  return (
+                    <option key={c} value={c} className="bg-slate-900 text-white">
+                      {flag}{c}
+                    </option>
+                  );
+                })}
                 <option value="All" className="bg-slate-900 text-white">🌍 All BRICS Nations</option>
               </select>
             </div>

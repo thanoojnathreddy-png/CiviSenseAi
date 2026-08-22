@@ -8,12 +8,36 @@ import {
   InfrastructureIndex,
   GovernmentProject,
   CommunityNeed,
-  AnalyticalInsight
+  AnalyticalInsight,
+  RegionOption
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 export const apiService = {
+  // Dynamic Administrative Regions & States
+  async getRegions(country?: string): Promise<RegionOption[]> {
+    const url = country && country !== 'All' ? `${API_BASE}/regions?country=${encodeURIComponent(country)}` : `${API_BASE}/regions`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch regions');
+      return await res.json();
+    } catch (err) {
+      // Graceful fallback to demographics if /regions is still propagating
+      const demos = await this.getDemographics(country);
+      return demos.map((d: Demographics) => ({
+        region_id: d.region_id,
+        district: d.district,
+        state: d.state,
+        country: d.country,
+        population: d.population,
+        latitude: d.latitude,
+        longitude: d.longitude,
+        focus_area: 'Infrastructure Planning',
+        localities: [`${d.district} Mandal`, `${d.district} Ward 1`, `${d.district} Ward 2`]
+      }));
+    }
+  },
   // Stats & KPIs
   async getStats(country?: string): Promise<ExecutiveStats> {
     const url = country && country !== 'All' ? `${API_BASE}/stats?country=${encodeURIComponent(country)}` : `${API_BASE}/stats`;

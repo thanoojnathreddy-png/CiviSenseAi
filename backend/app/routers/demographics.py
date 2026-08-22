@@ -4,6 +4,11 @@ from app.services.data_store import DATA_STORE
 
 router = APIRouter(prefix="/api", tags=["Demographics & Infrastructure"])
 
+@router.get("/regions", response_model=List[Dict[str, Any]])
+def get_regions(country: Optional[str] = Query(None, description="Country filter (e.g. India, Brazil, South Africa, All)")):
+    """Returns dynamic list of administrative regions, states, and districts."""
+    return DATA_STORE.get_regions(country=country)
+
 @router.get("/demographics", response_model=List[Dict[str, Any]])
 def get_demographics(country: Optional[str] = Query(None)):
     demos = list(DATA_STORE.demographics.values())
