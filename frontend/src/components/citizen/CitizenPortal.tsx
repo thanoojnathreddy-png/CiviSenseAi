@@ -21,12 +21,49 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+// District to Locality & Mandal Mapping for Dynamic Suggestions
+const DISTRICT_LOCALITY_MAP: Record<string, { mandals: string[]; defaultPlaceholder: string }> = {
+  Warangal: {
+    mandals: ['Chennaraopet Mandal', 'Narsampet', 'Wardhanna Pet', 'Geesugonda', 'Duggondi'],
+    defaultPlaceholder: 'e.g. Chennaraopet Mandal, Narsampet, Ward 4'
+  },
+  Adilabad: {
+    mandals: ['Utnoor Mandal', 'Asifabad Habitation', 'Indervelli', 'Jainoor', 'Bazarhatnoor'],
+    defaultPlaceholder: 'e.g. Utnoor Mandal, Asifabad, Tribal Habitation 3'
+  },
+  Anantapur: {
+    mandals: ['Kalyanadurg Mandal', 'Dharmavaram', 'Rayadurg', 'Guntakal', 'Kadiri'],
+    defaultPlaceholder: 'e.g. Kalyanadurg Mandal, Dharmavaram, Ward 2'
+  },
+  Kurnool: {
+    mandals: ['Adoni Municipality', 'Yemmiganur', 'Nandyal Road Ward 4', 'Dhone Block', 'Alur'],
+    defaultPlaceholder: 'e.g. Adoni, Yemmiganur, Old City Ward 11'
+  },
+  Yavatmal: {
+    mandals: ['Ghatanji Taluka', 'Pusad Rural', 'Umarkhed', 'Kelapur', 'Wani'],
+    defaultPlaceholder: 'e.g. Ghatanji Taluka, Pusad, Gram Panchayat 6'
+  },
+  'Varanasi Rural': {
+    mandals: ['Pindra Block', 'Cholapur Village', 'Arajiline Sector', 'Kashi Vidyapeeth', 'Sewapuri'],
+    defaultPlaceholder: 'e.g. Pindra Block, Cholapur, Village Sector 2'
+  },
+  Jequitinhonha: {
+    mandals: ['Comunidade Rural São Pedro', 'Bairro Centro', 'Vale do Jequitinhonha', 'Distrito Norte'],
+    defaultPlaceholder: 'e.g. Comunidade Rural, Bairro Centro, Setor 1'
+  },
+  Vhembe: {
+    mandals: ['Thohoyandou Ward 12', 'Makhado Rural Village', 'Musina Sector 3', 'Collins Chabane Area'],
+    defaultPlaceholder: 'e.g. Thohoyandou Ward 12, Makhado Village'
+  }
+};
+
 export const CitizenPortal: React.FC = () => {
   const { setMainTab, setAuthoritySubTab, refreshData, setLiveNotification } = useApp();
 
   const [language, setLanguage] = useState<string>('Telugu');
-  const [district, setDistrict] = useState<string>('Warangal');
-  const [locality, setLocality] = useState<string>('Chennaraopet Mandal');
+  const [district, setDistrict] = useState<string>('');
+  const [locality, setLocality] = useState<string>('');
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [inputText, setInputText] = useState<string>('మా గ్రామంలో రోడ్డు సరిగా లేదు. వర్షాకాలంలో పిల్లలు బడికి వెళ్లడానికి చాలా ఇబ్బంది పడుతున్నారు. అంబులెన్స్ కూడా రాలేకపోతోంది.');
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('voice');
   const [isVoiceSubmitted, setIsVoiceSubmitted] = useState<boolean>(true);
@@ -126,6 +163,12 @@ export const CitizenPortal: React.FC = () => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    if (!district) {
+      setLocationError('Please select your District / Administrative Region before submitting.');
+      return;
+    }
+    setLocationError(null);
+
     setPortalStage('processing');
     setProcessingStep(1);
 
@@ -176,7 +219,7 @@ export const CitizenPortal: React.FC = () => {
         country: countryMap[district] || 'India',
         state: stateMap[district] || 'Telangana',
         district: district,
-        locality: locality,
+        locality: locality || `${district} Sector`,
         is_voice: isVoiceSubmitted
       });
 
@@ -199,6 +242,9 @@ export const CitizenPortal: React.FC = () => {
   const handleReset = () => {
     setSubmissionResult(null);
     setInputText('');
+    setDistrict('');
+    setLocality('');
+    setLocationError(null);
     setAiExtraction(null);
     setPortalStage('form');
   };
@@ -470,19 +516,32 @@ export const CitizenPortal: React.FC = () => {
                 </div>
 
                 {/* District Picker */}
+                {/* District Picker */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                    <span>District / Administrative Region</span>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                      <span>District / Administrative Region</span>
+                    </span>
+                    <span className="text-[10px] text-rose-500 font-semibold uppercase">Required</span>
                   </label>
                   <select
                     value={district}
                     onChange={(e) => {
-                      setDistrict(e.target.value);
-                      setLocality(`${e.target.value} Sector`);
+                      const selected = e.target.value;
+                      setDistrict(selected);
+                      setLocationError(null);
+                      if (selected && DISTRICT_LOCALITY_MAP[selected]) {
+                        setLocality(DISTRICT_LOCALITY_MAP[selected].mandals[0]);
+                      } else {
+                        setLocality('');
+                      }
                     }}
-                    className="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer"
+                    className={`w-full text-xs font-medium bg-slate-50 border rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer transition-all ${
+                      locationError ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-300' : 'border-slate-300'
+                    }`}
                   >
+                    <option value="" disabled>Select District / Administrative Region</option>
                     <optgroup label="India - Telangana">
                       <option value="Warangal">Warangal (Rural Roads Focus)</option>
                       <option value="Adilabad">Adilabad (Water & Healthcare Focus)</option>
@@ -500,6 +559,12 @@ export const CitizenPortal: React.FC = () => {
                       <option value="Vhembe">Vhembe (Limpopo, South Africa)</option>
                     </optgroup>
                   </select>
+                  {locationError && (
+                    <p className="text-[11px] text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>{locationError}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -583,27 +648,65 @@ export const CitizenPortal: React.FC = () => {
 
               {/* Locality */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Mandal / Village / Neighborhood
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Mandal / Village / Neighborhood</span>
+                  {district ? (
+                    <span className="text-[10px] text-blue-600 font-medium">
+                      Linked to {district}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      Select district above
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
                   value={locality}
                   onChange={(e) => setLocality(e.target.value)}
-                  placeholder="e.g. Chennaraopet Mandal, Ward 4"
-                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
+                  placeholder={
+                    district && DISTRICT_LOCALITY_MAP[district]
+                      ? DISTRICT_LOCALITY_MAP[district].defaultPlaceholder
+                      : 'Select District / Administrative Region first...'
+                  }
+                  disabled={!district}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden disabled:opacity-60 disabled:cursor-not-allowed"
                 />
+                {district && DISTRICT_LOCALITY_MAP[district] && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[10px] text-slate-400 font-semibold">Suggested areas:</span>
+                    {DISTRICT_LOCALITY_MAP[district].mandals.map((mandal) => (
+                      <button
+                        key={mandal}
+                        type="button"
+                        onClick={() => setLocality(mandal)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                          locality === mandal
+                            ? 'bg-blue-100 text-blue-800 border-blue-300 font-semibold'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 hover:text-slate-800'
+                        }`}
+                      >
+                        {mandal}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={!inputText.trim()}
+                disabled={!inputText.trim() || !district}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Submit Concern for Review</span>
               </button>
+              {!district && inputText.trim() && (
+                <p className="text-center text-[11px] text-amber-700 font-medium">
+                  ⚠️ Please select a District / Administrative Region to enable submission.
+                </p>
+              )}
             </form>
           </div>
 
