@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation, SupportedLanguageCode } from '../../i18n';
 import { VoiceRecorder } from './VoiceRecorder';
 import { LiveAIExtractor } from './LiveAIExtractor';
 import { apiService } from '../../services/api';
@@ -10,27 +11,32 @@ import {
   MapPin,
   Globe,
   Sparkles,
-  MessageSquare,
   ArrowRight,
   ShieldCheck,
   Edit3,
   Check,
   Clock,
   HelpCircle,
-  FileText,
   AlertCircle
 } from 'lucide-react';
 
 export const CitizenPortal: React.FC = () => {
-  const { regions, isLoading, setMainTab, setAuthoritySubTab, refreshData, setLiveNotification } = useApp();
+  const { regions, setMainTab, setAuthoritySubTab, refreshData, setLiveNotification } = useApp();
+  const { t, currentLanguage, setLanguage: setGlobalLanguage, supportedLanguages } = useTranslation();
 
-  const [language, setLanguage] = useState<string>('Telugu');
+  // Intake language is initialized to current app language
+  const [language, setLanguage] = useState<string>(currentLanguage.name);
   const [district, setDistrict] = useState<string>('');
   const [locality, setLocality] = useState<string>('');
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [inputText, setInputText] = useState<string>('మా గ్రామంలో రోడ్డు సరిగా లేదు. వర్షాకాలంలో పిల్లలు బడికి వెళ్లడానికి చాలా ఇబ్బంది పడుతున్నారు. అంబులెన్స్ కూడా రాలేకపోతోంది.');
+  const [inputText, setInputText] = useState<string>('');
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('voice');
-  const [isVoiceSubmitted, setIsVoiceSubmitted] = useState<boolean>(true);
+  const [isVoiceSubmitted, setIsVoiceSubmitted] = useState<boolean>(false);
+
+  // Synchronize when global language changes
+  useEffect(() => {
+    setLanguage(currentLanguage.name);
+  }, [currentLanguage]);
 
   // Progressive Stages: 'form' -> 'processing' -> 'confirm_interpretation' -> 'submitted'
   const [portalStage, setPortalStage] = useState<'form' | 'processing' | 'confirm_interpretation' | 'submitted'>('form');
@@ -41,8 +47,22 @@ export const CitizenPortal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<any | null>(null);
 
-  // Sample prompts
+  // Multilingual Sample Prompts for all supported languages
   const samplePrompts: Record<string, Array<{ label: string; text: string }>> = {
+    English: [
+      {
+        label: 'Hospital Emergency Power Deficit',
+        text: 'The Community Health Centre in Kalyanadurg suffers 6-hour daily power cuts with no generator backup. Oxygen concentrators stop working.'
+      },
+      {
+        label: 'Rural Road Washout',
+        text: 'The connecting road link to the main market yard is severely damaged by rainfall. Farmers cannot transport harvest produce safely.'
+      },
+      {
+        label: 'Drinking Water Pipeline Breakage',
+        text: 'The municipal drinking water pipeline has burst in sector 4. Contaminated water is mixing into household supply.'
+      }
+    ],
     Telugu: [
       {
         label: 'రోడ్డు సమస్య (Rural Road)',
@@ -63,22 +83,62 @@ export const CitizenPortal: React.FC = () => {
         text: 'हमारे इलाके में पिछले 3 हफ्तों से पीने का साफ पानी नहीं आ रहा है, अस्पताल में मरीज बढ़ रहे हैं।'
       },
       {
-        label: 'स्वास्थ्य केंद्र (PHC Staff Shortage)',
+        label: 'स्वास्थ्य केंद्र डॉक्टर कमी (PHC Shortage)',
         text: 'हमारे प्राथमिक स्वास्थ्य उपकेंद्र में कोई डॉक्टर या नर्स उपलब्ध नहीं है, आपातकालीन स्थिति में 40 किलोमीटर दूर जाना पड़ता है।'
       },
       {
-        label: 'स्कूल बिजली (School Electrification)',
+        label: 'स्कूल बिजली व जलभराव (School Electrification)',
         text: 'हमारे ब्लॉक के प्राथमिक विद्यालय में बरसात के समय जलभराव हो जाता है और बिजली का कनेक्शन नहीं है।'
       }
     ],
-    English: [
+    Tamil: [
       {
-        label: 'Hospital Power Failure',
-        text: 'The Community Health Centre in Kalyanadurg suffers 6-hour daily power cuts with no generator backup. Oxygen concentrators stop working.'
+        label: 'கிராமப்புற சாலை சேதம் (Rural Road)',
+        text: 'எங்கள் கிராமத்தில் சாலை மிகவும் சேதமடைந்துள்ளது. மழைக்காலத்தில் பள்ளி குழந்தைகள் செல்ல சிரமப்படுகின்றனர்.'
       },
       {
-        label: 'Agricultural Road Erosion',
-        text: 'The connecting road link to the main market yard is severely damaged. Farmers cannot transport produce safely.'
+        label: 'குடிநீர் பற்றாக்குறை (Water Scarcity)',
+        text: 'எங்கள் பகுதியில் கடந்த இரண்டு வாரங்களாக குடிநீர் விநியோகம் இல்லை. பொது குழாய்களில் உப்பு நீர் மட்டுமே வருகிறது.'
+      }
+    ],
+    Kannada: [
+      {
+        label: 'ಕುಡಿಯುವ ನೀರಿನ ಪೈಪ್‌ಲೈನ್ (Water Pipeline)',
+        text: 'ನಮ್ಮ ಗ್ರಾಮದಲ್ಲಿ ಕುಡಿಯುವ ನೀರಿನ ಪೈಪ್‌ಲೈನ್ ಒಡೆದು ನೀರು ಪೋಲಾಗುತ್ತಿದೆ, ಶುದ್ಧ ನೀರು ಸಿಗುತ್ತಿಲ್ಲ.'
+      },
+      {
+        label: 'ರಸ್ತೆ ದುರಸ್ತಿ ಸಮಸ್ಯೆ (Road Repair)',
+        text: 'ಮುಖ್ಯ ಪಟ್ಟಣಕ್ಕೆ ಸಂಪರ್ಕಿಸುವ ರಸ್ತೆ ಸಂಪೂರ್ಣ ಹಾಳಾಗಿದೆ, ಬಸ್ ಸಂಚಾರ ಸ್ಥಗಿತಗೊಂಡಿದೆ.'
+      }
+    ],
+    Malayalam: [
+      {
+        label: 'ആരോഗ്യ കേന്ദ്രം ഡോക്ടർ ക്ഷാമം (PHC Shortage)',
+        text: 'ഞങ്ങളുടെ പ്രദേശത്തെ പ്രാഥമിക ആരോഗ്യ കേന്ദ്രത്തിൽ ഡോക്ടറും ആംബുലൻസ് സൗകര്യവും ലഭ്യമല്ല.'
+      },
+      {
+        label: 'റോഡ് തകർച്ച (Road Washout)',
+        text: 'മഴക്കാലത്ത് പ്രധാന റോഡ് തകർന്ന് ഗതാഗതം തടസ്സപ്പെട്ടു, സ്കൂൾ കുട്ടികൾക്ക് യാത്ര ബുദ്ധിമുട്ടാണ്.'
+      }
+    ],
+    Marathi: [
+      {
+        label: 'शेतीमाल वाहतूक रस्ता (Market Road)',
+        text: 'आमच्या गावातील शेतीमाल वाहतुकीचा रस्ता पावसामुळे वाहून गेला आहे, शेतकरी हवालदिल झाले आहेत.'
+      },
+      {
+        label: 'पिण्याचे पाणी टंचाई (Drinking Water)',
+        text: 'आमच्या वस्तीत गेल्या १५ दिवसांपासून टँकरचे पाणी वेळेवर येत नाही, पिण्याच्या पाण्याचे दुर्भिक्ष आहे.'
+      }
+    ],
+    Bengali: [
+      {
+        label: 'পানীয় জলের নলকূপ সমস্যা (Tube Well Deficit)',
+        text: 'আমাদের গ্রামে পানীয় জলের নলকূপগুলো নষ্ট হয়ে গেছে, দূর থেকে জল আনতে হচ্ছে।'
+      },
+      {
+        label: 'গ্রামের ভাঙা রাস্তা (Damaged Road)',
+        text: 'বর্ষার জলে গ্রামের কাঁচা রাস্তা ভেঙে গেছে, অ্যাম্বুলেন্স আসার কোনো উপায় নেই।'
       }
     ],
     Portuguese: [
@@ -122,13 +182,22 @@ export const CitizenPortal: React.FC = () => {
     }
   };
 
+  // Handle language change from select
+  const handleLanguageChange = (newLangName: string) => {
+    setLanguage(newLangName);
+    const matched = supportedLanguages.find((l) => l.name === newLangName);
+    if (matched) {
+      setGlobalLanguage(matched.code);
+    }
+  };
+
   // Trigger Progressive Processing Sequence
   const handleInitiateSubmission = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
     if (!district.trim()) {
-      setLocationError('Please enter your District / Administrative Region before submitting.');
+      setLocationError(t('citizen.districtError'));
       return;
     }
     setLocationError(null);
@@ -136,25 +205,10 @@ export const CitizenPortal: React.FC = () => {
     setPortalStage('processing');
     setProcessingStep(1);
 
-    // Step 1 -> Step 2
-    setTimeout(() => {
-      setProcessingStep(2);
-    }, 280);
-
-    // Step 2 -> Step 3
-    setTimeout(() => {
-      setProcessingStep(3);
-    }, 560);
-
-    // Step 3 -> Step 4
-    setTimeout(() => {
-      setProcessingStep(4);
-    }, 840);
-
-    // Step 4 -> Show Interpretation Confirmation
-    setTimeout(() => {
-      setPortalStage('confirm_interpretation');
-    }, 1150);
+    setTimeout(() => setProcessingStep(2), 280);
+    setTimeout(() => setProcessingStep(3), 560);
+    setTimeout(() => setProcessingStep(4), 840);
+    setTimeout(() => setPortalStage('confirm_interpretation'), 1150);
   };
 
   // Final Confirmation & Submission to Backend
@@ -201,6 +255,7 @@ export const CitizenPortal: React.FC = () => {
     setLocality('');
     setLocationError(null);
     setAiExtraction(null);
+    setIsVoiceSubmitted(false);
     setPortalStage('form');
   };
 
@@ -212,24 +267,25 @@ export const CitizenPortal: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold uppercase tracking-wider font-mono">
-                Digital Public Good Intake
+                {t('home.dpgPlatform')}
               </span>
-              <span className="text-xs text-slate-500">Citizen Development Feedback</span>
+              <span className="text-xs text-slate-500 font-medium">
+                {t('citizen.intakeHeaderTitle')}
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
-              What does your community need?
+              {t('home.heroTitle')}
             </h1>
             <p className="text-sm text-slate-600 mt-1 max-w-3xl">
-              Voice or write your neighborhood or village infrastructure challenge in your native language. 
-              Your request is analyzed, grouped with local community signals, and provided directly to public planning authorities.
+              {t('citizen.intakeHeaderSubtitle')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs text-slate-600 self-start md:self-auto">
             <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
             <div>
-              <div className="font-semibold text-slate-800">Public Service Channel</div>
-              <div className="text-[11px] text-slate-500">Aggregated for community planning</div>
+              <div className="font-semibold text-slate-800">{t('home.principle1Title')}</div>
+              <div className="text-[11px] text-slate-500">{t('home.principle2Title')}</div>
             </div>
           </div>
         </div>
@@ -243,8 +299,8 @@ export const CitizenPortal: React.FC = () => {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Understanding your request</h2>
-            <p className="text-xs text-slate-500 mt-1">Analyzing civic signals with transparent multilingual NLP</p>
+            <h2 className="text-xl font-bold text-slate-900">{t('citizen.analyzing')}</h2>
+            <p className="text-xs text-slate-500 mt-1">{t('extractor.nlpBadge')}</p>
           </div>
 
           {/* Sequential Checkpoints */}
@@ -253,28 +309,28 @@ export const CitizenPortal: React.FC = () => {
               processingStep >= 1 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-50 text-slate-400'
             }`}>
               <CheckCircle2 className={`w-4 h-4 ${processingStep >= 1 ? 'text-emerald-600' : 'text-slate-300'}`} />
-              <span className="font-medium">1. Language identified ({language})</span>
+              <span className="font-medium">1. {t('extractor.language')} ({language})</span>
             </div>
 
             <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
               processingStep >= 2 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-50 text-slate-400'
             }`}>
               <CheckCircle2 className={`w-4 h-4 ${processingStep >= 2 ? 'text-emerald-600' : 'text-slate-300'}`} />
-              <span className="font-medium">2. Community issue identified ({aiExtraction?.category || 'Infrastructure'})</span>
+              <span className="font-medium">2. {t('extractor.category')} ({aiExtraction?.category || 'Infrastructure'})</span>
             </div>
 
             <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
               processingStep >= 3 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-50 text-slate-400'
             }`}>
               <CheckCircle2 className={`w-4 h-4 ${processingStep >= 3 ? 'text-emerald-600' : 'text-slate-300'}`} />
-              <span className="font-medium">3. Location matched ({district}, {locality})</span>
+              <span className="font-medium">3. {t('citizen.districtLabel')} ({district || 'Local'})</span>
             </div>
 
             <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
               processingStep >= 4 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-50 text-slate-400'
             }`}>
               <CheckCircle2 className={`w-4 h-4 ${processingStep >= 4 ? 'text-emerald-600' : 'text-slate-300'}`} />
-              <span className="font-medium">4. Urgency & impact assessed ({aiExtraction?.urgency || 'High'} urgency)</span>
+              <span className="font-medium">4. {t('extractor.severityUrgency')} ({aiExtraction?.urgency || 'High'})</span>
             </div>
           </div>
         </div>
@@ -286,17 +342,18 @@ export const CitizenPortal: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                AI Interpretation
+                {t('extractor.title')}
               </span>
-              <span className="text-xs text-slate-500 font-medium">Verify your concern before recording</span>
+              <span className="text-xs text-slate-500 font-medium">{t('citizen.reviewTitle')}</span>
             </div>
-            <span className="text-xs font-mono text-slate-400">Step 2 of 2</span>
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">We understood this as:</span>
+            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+              {t('citizen.reviewTitle')}:
+            </span>
             <h2 className="text-xl font-extrabold text-slate-900">
-              {aiExtraction?.subcategory || 'Rural Infrastructure Need'}
+              {aiExtraction?.subcategory || 'Infrastructure Need'}
             </h2>
             <p className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-lg border border-slate-200 leading-relaxed italic">
               "{aiExtraction?.translated_text || inputText}"
@@ -306,19 +363,19 @@ export const CitizenPortal: React.FC = () => {
           {/* Structured Summary Badges */}
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Location</span>
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">{t('citizen.districtLabel')}</span>
               <span className="font-bold text-slate-900">{district}</span>
               <span className="text-[10px] text-slate-500 block truncate">{locality}</span>
             </div>
 
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Category</span>
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">{t('extractor.category')}</span>
               <span className="font-bold text-blue-700">{aiExtraction?.category || 'Transportation'}</span>
               <span className="text-[10px] text-slate-500 block">{aiExtraction?.affected_group || 'Residents'}</span>
             </div>
 
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Urgency Level</span>
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">{t('extractor.severityUrgency')}</span>
               <span className="font-bold text-rose-700">{aiExtraction?.urgency || 'High'}</span>
               <span className="text-[10px] text-slate-500 block font-mono">Severity: {aiExtraction?.severity || 8}/10</span>
             </div>
@@ -328,10 +385,10 @@ export const CitizenPortal: React.FC = () => {
           <div className="bg-blue-50/70 p-4 rounded-xl border border-blue-200 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
               <HelpCircle className="w-4 h-4 text-blue-600" />
-              <span>Is this interpretation accurate for your community?</span>
+              <span>{t('home.govTitle')}</span>
             </div>
             <p className="text-[11px] text-blue-800 leading-relaxed font-normal">
-              Confirming allows the platform to group your request with neighboring signals and alert public planners. You can edit the text if anything was misunderstood.
+              {t('home.principle3Desc')}
             </p>
           </div>
 
@@ -343,7 +400,7 @@ export const CitizenPortal: React.FC = () => {
               className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Edit Concern</span>
+              <span>{t('citizen.backToEdit')}</span>
             </button>
 
             <button
@@ -355,12 +412,12 @@ export const CitizenPortal: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Recording in Community Analytics...</span>
+                  <span>{t('citizen.submitting')}</span>
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Yes, Confirm & Record Request</span>
+                  <span>{t('citizen.confirmSubmitBtn')}</span>
                 </>
               )}
             </button>
@@ -377,13 +434,13 @@ export const CitizenPortal: React.FC = () => {
 
           <div>
             <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              Request ID: {submissionResult.request?.request_id || 'REQ-TE-9042'}
+              {t('citizen.referenceId')}: {submissionResult.request?.request_id || 'REQ-9042'}
             </span>
             <h2 className="text-2xl font-extrabold text-slate-900 mt-3">
-              Your community need has been recorded.
+              {t('citizen.successTitle')}
             </h2>
             <p className="text-xs text-slate-600 mt-1">
-              Recorded on {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} for {submissionResult.request?.district} ({submissionResult.request?.locality || 'Rural Sector'}).
+              {t('citizen.successSubtitle')}
             </p>
           </div>
 
@@ -391,22 +448,22 @@ export const CitizenPortal: React.FC = () => {
           <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 text-left space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-2">
               <Clock className="w-4 h-4 text-blue-600" />
-              <span>What happens next?</span>
+              <span>{t('home.howItWorksTitle')}</span>
             </div>
             
             <p className="text-xs text-slate-700 leading-relaxed font-normal">
-              Your request contributes to community-level analysis. Similar requests are grouped to help public authorities identify areas where infrastructure or public services may need attention.
+              {t('home.step2Desc')}
             </p>
 
             <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-slate-200">
               <div>
-                <span className="text-slate-500 text-[11px] block">Correlated Community Demand</span>
+                <span className="text-slate-500 text-[11px] block">{t('dashboard.kpiTotalRequests')}</span>
                 <span className="font-bold text-blue-700 font-mono text-sm">
-                  {submissionResult.community_impact?.total_correlated_requests || 42} Citizen Signals
+                  {submissionResult.community_impact?.total_correlated_requests || 42} {t('common.records')}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 text-[11px] block">Identified Sector</span>
+                <span className="text-slate-500 text-[11px] block">{t('extractor.category')}</span>
                 <span className="font-bold text-slate-900">
                   {submissionResult.community_impact?.category || 'Transportation'}
                 </span>
@@ -418,7 +475,7 @@ export const CitizenPortal: React.FC = () => {
           <div className="text-[11px] text-slate-500 bg-white p-3 rounded-lg border border-slate-200 text-left flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <span>
-              <strong>Privacy Guaranteed:</strong> Feedback is aggregated at the community and mandal level to guide public works planning without publishing personal citizen identifiers.
+              {t('home.principle1Desc')}
             </span>
           </div>
 
@@ -431,14 +488,14 @@ export const CitizenPortal: React.FC = () => {
               }}
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
             >
-              <span>Explore Community Priorities in Portal</span>
+              <span>{t('citizen.viewInDashboard')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleReset}
               className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
             >
-              Share Another Need
+              {t('citizen.submitAnother')}
             </button>
           </div>
         </div>
@@ -456,17 +513,18 @@ export const CitizenPortal: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Select Language / భాష</span>
+                    <span>{t('citizen.selectLanguage')}</span>
                   </label>
                   <select
                     value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer"
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className="w-full text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer"
                   >
-                    <option value="Telugu">తెలుగు (Telugu - India)</option>
-                    <option value="Hindi">हिन्दी (Hindi - India)</option>
-                    <option value="English">English (Universal)</option>
-                    <option value="Portuguese">Português (Brazil)</option>
+                    {supportedLanguages.map((l) => (
+                      <option key={l.code} value={l.name}>
+                        {l.flag} {l.nativeName} ({l.name})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -475,9 +533,9 @@ export const CitizenPortal: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                      <span>District / Administrative Region</span>
+                      <span>{t('citizen.districtLabel')}</span>
                     </span>
-                    <span className="text-[10px] text-rose-500 font-semibold uppercase">Required</span>
+                    <span className="text-[10px] text-rose-500 font-semibold uppercase">{t('citizen.districtRequired')}</span>
                   </label>
                   <input
                     type="text"
@@ -486,7 +544,7 @@ export const CitizenPortal: React.FC = () => {
                       setDistrict(e.target.value);
                       if (locationError) setLocationError(null);
                     }}
-                    placeholder="Enter your district / administrative region (e.g. Kurnool, Warangal, Hyderabad)"
+                    placeholder={t('citizen.districtPlaceholder')}
                     className={`w-full text-xs font-medium bg-slate-50 border rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden transition-all ${
                       locationError ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-300' : 'border-slate-300'
                     }`}
@@ -511,7 +569,7 @@ export const CitizenPortal: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🎙️ Speak your concern (వాయిస్)
+                  🎙️ {t('citizen.speakConcern')}
                 </button>
                 <button
                   type="button"
@@ -522,7 +580,7 @@ export const CitizenPortal: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  ✍️ Write your concern (టెక్స్ట్)
+                  ✍️ {t('citizen.writeConcern')}
                 </button>
               </div>
 
@@ -537,9 +595,9 @@ export const CitizenPortal: React.FC = () => {
               {/* Text Input Area */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Describe the Infrastructure Concern</span>
+                  <span>{t('citizen.describeConcern')}</span>
                   <span className="text-[11px] text-slate-400 font-normal">
-                    {inputText.length} characters
+                    {inputText.length} {t('citizen.characters')}
                   </span>
                 </label>
                 <textarea
@@ -549,16 +607,16 @@ export const CitizenPortal: React.FC = () => {
                     setInputText(e.target.value);
                     setIsVoiceSubmitted(false);
                   }}
-                  placeholder="Describe your village or community infrastructure need in detail..."
+                  placeholder={t('citizen.placeholderText')}
                   className="w-full text-xs leading-relaxed bg-white border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:outline-hidden font-sans"
                 />
               </div>
 
-              {/* Sample Prompts */}
-              {samplePrompts[language] && (
+              {/* Sample Prompts for selected intake language */}
+              {samplePrompts[language] && samplePrompts[language].length > 0 && (
                 <div>
                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">
-                    Example issues in {language}:
+                    {t('citizen.samplePromptsLabel')}
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {samplePrompts[language].map((p, idx) => (
@@ -578,7 +636,7 @@ export const CitizenPortal: React.FC = () => {
                 </div>
               )}
 
-              {/* Locality */}
+              {/* Mandal / Locality */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
                   <span>Mandal / Village / Neighborhood</span>
@@ -588,7 +646,7 @@ export const CitizenPortal: React.FC = () => {
                   type="text"
                   value={locality}
                   onChange={(e) => setLocality(e.target.value)}
-                  placeholder="e.g. Chennaraopet, Ward 4, Banjara Hills, etc."
+                  placeholder="e.g. Chennaraopet, Ward 4, Downtown, etc."
                   className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
                 />
               </div>
@@ -600,11 +658,11 @@ export const CitizenPortal: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Submit Concern for Review</span>
+                <span>{t('citizen.submitNeedBtn')}</span>
               </button>
               {!district.trim() && inputText.trim() && (
                 <p className="text-center text-[11px] text-amber-700 font-medium">
-                  ⚠️ Please enter a District / Administrative Region to enable submission.
+                  ⚠️ {t('citizen.districtError')}
                 </p>
               )}
             </form>
@@ -617,10 +675,10 @@ export const CitizenPortal: React.FC = () => {
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-xs space-y-2">
               <div className="flex items-center gap-1.5 font-bold text-slate-800">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span>How your request informs public planning</span>
+                <span>{t('home.howItWorksTitle')}</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px]">
-                Every submission is normalized into structured civic categories, aggregated with nearby community requests, and correlated against infrastructure gap indicators and ongoing public works to support evidence-based allocations.
+                {t('home.step2Desc')}
               </p>
             </div>
           </div>

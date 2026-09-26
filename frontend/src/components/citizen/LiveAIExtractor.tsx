@@ -1,6 +1,7 @@
 import React from 'react';
 import { AIStructuredExtraction } from '../../types';
-import { Sparkles, Tag, AlertTriangle, Users, Globe2, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from '../../i18n';
+import { Sparkles, Tag, Users, Globe2, CheckCircle2 } from 'lucide-react';
 import { PriorityBadge, CategoryBadge } from '../common/Badge';
 
 interface LiveAIExtractorProps {
@@ -9,16 +10,17 @@ interface LiveAIExtractorProps {
 }
 
 export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
-  extraction,
-  isLoading
+  extraction
 }) => {
+  const { t } = useTranslation();
+
   if (!extraction) {
     return (
       <div className="bg-slate-50 rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400">
         <Sparkles className="w-6 h-6 mx-auto mb-2 text-slate-400" />
-        <p className="text-xs font-medium text-slate-600">AI Structured Extraction Pipeline</p>
+        <p className="text-xs font-medium text-slate-600">{t('extractor.emptyTitle')}</p>
         <p className="text-[11px] text-slate-400 mt-1">
-          Type or speak your request to see real-time categorization, severity rating, and translation preview.
+          {t('extractor.emptyDesc')}
         </p>
       </div>
     );
@@ -30,11 +32,11 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-600" />
           <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-            Real-Time AI Extraction
+            {t('extractor.title')}
           </span>
         </div>
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono font-medium">
-          Multilingual NLP Engine
+          {t('extractor.nlpBadge')}
         </span>
       </div>
 
@@ -43,7 +45,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         {/* Category */}
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">
-            Category
+            {t('extractor.category')}
           </span>
           <CategoryBadge category={extraction.category} />
           <div className="text-[11px] text-slate-600 font-medium mt-1 truncate">
@@ -54,7 +56,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         {/* Severity & Urgency */}
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">
-            Severity & Urgency
+            {t('extractor.severityUrgency')}
           </span>
           <div className="flex items-center gap-2">
             <PriorityBadge level={extraction.urgency} score={extraction.severity * 10} size="sm" />
@@ -73,7 +75,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <div className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
             <Users className="w-3 h-3 text-slate-400" />
-            <span>Affected Group</span>
+            <span>{t('extractor.affectedGroup')}</span>
           </div>
           <div className="text-xs font-semibold text-slate-800">
             {extraction.affected_group}
@@ -84,7 +86,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <div className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
             <Globe2 className="w-3 h-3 text-slate-400" />
-            <span>Language</span>
+            <span>{t('extractor.language')}</span>
           </div>
           <div className="text-xs font-semibold text-slate-800">
             {extraction.language}
@@ -97,7 +99,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
         <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 text-xs">
           <div className="flex items-center gap-1.5 text-blue-900 font-bold mb-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-            <span>Standardized English Policy Translation:</span>
+            <span>{t('extractor.englishTranslation')}</span>
           </div>
           <p className="text-slate-700 italic font-medium leading-relaxed">
             "{extraction.translated_text}"
@@ -109,7 +111,7 @@ export const LiveAIExtractor: React.FC<LiveAIExtractorProps> = ({
       {extraction.key_entities && extraction.key_entities.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap pt-1">
           <Tag className="w-3 h-3 text-slate-400" />
-          <span className="text-[10px] font-semibold text-slate-400 uppercase">Entities:</span>
+          <span className="text-[10px] font-semibold text-slate-400 uppercase">{t('extractor.entities')}</span>
           {extraction.key_entities.map((ent, i) => (
             <span
               key={i}

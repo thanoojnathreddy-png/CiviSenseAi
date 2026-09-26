@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AnalyticalInsight } from '../../types';
+import { useTranslation } from '../../i18n';
 import {
   Sparkles,
   TrendingUp,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export const InsightsView: React.FC = () => {
+  const { t } = useTranslation();
   const { insights, selectedCountry, setAuthoritySubTab, setSelectedDistrict, setSelectedCategory } = useApp();
 
   const [selectedType, setSelectedType] = useState<string>('All');
@@ -36,31 +38,31 @@ export const InsightsView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              Analytical Intelligence
+              {t('insights.tagIntelligence', 'Analytical Intelligence')}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Data-Backed Public Decision Support
+              {t('insights.tagDecisionSupport', 'Data-Backed Public Decision Support')}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Analytical Civic Insights & Emerging Trends
+            {t('insights.mainTitle', 'Analytical Civic Insights & Emerging Trends')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Synthesizing relationships across citizen requests, demographic scale, and infrastructure deficits to surface macro planning priorities.
+            {t('insights.mainSubtitle', 'Synthesizing relationships across citizen requests, demographic scale, and infrastructure deficits to surface macro planning priorities.')}
           </p>
         </div>
 
         {/* Filter Tabs */}
         <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-medium self-start md:self-auto flex-wrap">
-          {['All', 'Emerging Need', 'Infrastructure Gap', 'Coverage Gap', 'Emerging Trend'].map((t) => (
+          {['All', 'Emerging Need', 'Infrastructure Gap', 'Coverage Gap', 'Emerging Trend'].map((tType) => (
             <button
-              key={t}
-              onClick={() => setSelectedType(t)}
+              key={tType}
+              onClick={() => setSelectedType(tType)}
               className={`px-3 py-1.5 rounded transition-all cursor-pointer ${
-                selectedType === t ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                selectedType === tType ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t === 'All' ? 'All Insights' : t}
+              {tType === 'All' ? t('insights.allInsights', 'All Insights') : tType}
             </button>
           ))}
         </div>
@@ -106,7 +108,7 @@ export const InsightsView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-1">
-                    Supporting Metric Evidence
+                    {t('insights.supportingEvidence', 'Supporting Metric Evidence')}
                   </span>
                   <span className="font-mono font-medium text-slate-800 leading-snug">
                     {insight.metrics_summary}
@@ -115,7 +117,7 @@ export const InsightsView: React.FC = () => {
 
                 <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-100">
                   <span className="text-[10px] text-blue-900 uppercase font-semibold block mb-1">
-                    Suggested Public Administration Action
+                    {t('insights.suggestedAction', 'Suggested Public Administration Action')}
                   </span>
                   <span className="text-slate-800 font-medium leading-snug">
                     {insight.suggested_attention}
@@ -126,13 +128,13 @@ export const InsightsView: React.FC = () => {
               {/* Action Jump */}
               <div className="flex items-center justify-between pt-1 text-xs">
                 <span className="text-[11px] text-slate-500 font-medium">
-                  Sector: <span className="font-semibold text-slate-800">{insight.category}</span>
+                  {t('insights.sector', 'Sector:')} <span className="font-semibold text-slate-800">{insight.category}</span>
                 </span>
                 <button
                   onClick={() => handleExamineOnMap(insight.category)}
                   className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
                 >
-                  <span>Examine on Demand Map</span>
+                  <span>{t('insights.examineMap', 'Examine on Demand Map')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

@@ -6,19 +6,19 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer
 } from 'recharts';
 import { ExecutiveStats } from '../../types';
-import { TrendingUp, PieChart as PieIcon, Globe2, AlertOctagon } from 'lucide-react';
+import { useTranslation } from '../../i18n';
+import { TrendingUp, PieChart as PieIcon, Globe2 } from 'lucide-react';
 
 interface TrendChartsProps {
   stats: ExecutiveStats | null;
 }
 
 export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
+  const { t } = useTranslation();
+
   if (!stats) return null;
 
   const trendData = stats.trend_over_time || [
@@ -41,7 +41,11 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
     Hindi: '#0D9488',
     English: '#64748B',
     Portuguese: '#D97706',
-    Tamil: '#7C3AED'
+    Tamil: '#7C3AED',
+    Kannada: '#EA580C',
+    Malayalam: '#059669',
+    Marathi: '#DB2777',
+    Bengali: '#CA8A04'
   };
 
   const langData = Object.entries(stats.language_distribution || {}).map(([name, value]) => ({
@@ -59,15 +63,15 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blue-600" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Citizen Request Ingestion Velocity
+                {t('dashboard.kpiTotalRequests')}
               </h3>
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono font-medium">
-              4-Week Trend
+              {t('dashboard.filterTime')}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 mt-2">
-            Weekly volume of multilingual citizen submissions vs. prioritized project actions
+            {t('home.heroSubtitle')}
           </p>
         </div>
 
@@ -99,7 +103,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorRequests)"
-                name="Total Submissions"
+                name="Requests"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -111,7 +115,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
           <PieIcon className="w-4 h-4 text-blue-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-            Category Breakdown
+            {t('dashboard.filterCategory')}
           </h3>
         </div>
 
@@ -138,7 +142,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
           <Globe2 className="w-4 h-4 text-blue-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-            Multilingual Intake
+            {t('nav.language')}
           </h3>
         </div>
 
@@ -150,13 +154,13 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
                 <span className="font-semibold text-slate-800">{l.name}</span>
               </div>
               <span className="font-mono text-slate-700 font-bold">
-                {l.value} requests
+                {l.value} {t('common.records')}
               </span>
             </div>
           ))}
 
           <div className="p-2.5 rounded-lg bg-blue-50/60 border border-blue-100 text-[11px] text-blue-900">
-            <span className="font-bold">DPG Extensibility:</span> Native support for Telugu, Hindi, English, Portuguese & extensible to Russian/Mandarin.
+            <span className="font-bold">{t('home.principle1Title')}:</span> {t('home.principle2Desc')}
           </div>
         </div>
       </div>

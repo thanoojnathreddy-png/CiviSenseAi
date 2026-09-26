@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { InfrastructureIndex } from '../../types';
+import { useTranslation } from '../../i18n';
 import {
   BarChart,
   Bar,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 
 export const InfrastructureView: React.FC = () => {
+  const { t } = useTranslation();
   const {
     infrastructure,
     selectedCountry,
@@ -68,23 +70,23 @@ export const InfrastructureView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              Sector Diagnostics
+              {t('infra.tagDiagnostics', 'Sector Diagnostics')}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Multi-Sector Infrastructure Indicators
+              {t('infra.tagIndicators', 'Multi-Sector Infrastructure Indicators')}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Regional Infrastructure & Gap Analysis
+            {t('infra.mainTitle', 'Regional Infrastructure & Gap Analysis')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Compare official public infrastructure indicators across administrative regions to detect disparities and cross-reference with citizen demand.
+            {t('infra.mainSubtitle', 'Compare official public infrastructure indicators across administrative regions to detect disparities and cross-reference with citizen demand.')}
           </p>
         </div>
 
         <div className="text-right hidden sm:block">
-          <span className="text-xs text-slate-500 block">Regions Evaluated</span>
-          <span className="text-xl font-extrabold font-mono text-slate-900">{filteredInfra.length} Districts</span>
+          <span className="text-xs text-slate-500 block">{t('infra.regionsEvaluated', 'Regions Evaluated')}</span>
+          <span className="text-xl font-extrabold font-mono text-slate-900">{filteredInfra.length} {t('infra.districts', 'Districts')}</span>
         </div>
       </div>
 
@@ -94,10 +96,10 @@ export const InfrastructureView: React.FC = () => {
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-600" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Sector Infrastructure Capacity Index (0–100 Scale)
+              {t('infra.capacityIndexTitle', 'Sector Infrastructure Capacity Index (0–100 Scale)')}
             </h3>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">Higher is better (&lt;40 = Critical Deficit)</span>
+          <span className="text-[11px] text-slate-400 font-mono">{t('infra.higherIsBetter', 'Higher is better (<40 = Critical Deficit)')}</span>
         </div>
 
         <div className="h-72 w-full">
@@ -130,10 +132,10 @@ export const InfrastructureView: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-            Regional Infrastructure Matrix & Citizen Demand Correlation
+            {t('infra.matrixTitle', 'Regional Infrastructure Matrix & Citizen Demand Correlation')}
           </span>
           <span className="text-[11px] text-slate-500 font-mono">
-            Red cells indicate critical deficits (&lt;40)
+            {t('infra.criticalDeficitHint', 'Red cells indicate critical deficits (<40)')}
           </span>
         </div>
 
@@ -141,15 +143,15 @@ export const InfrastructureView: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3">Region</th>
-                <th className="px-3 py-3 text-center">Road Access</th>
-                <th className="px-3 py-3 text-center">Water Supply</th>
-                <th className="px-3 py-3 text-center">Healthcare</th>
-                <th className="px-3 py-3 text-center">Education</th>
-                <th className="px-3 py-3 text-center">Waste Mgmt</th>
-                <th className="px-3 py-3 text-center">Electricity</th>
-                <th className="px-3 py-3 text-center">Transit</th>
-                <th className="px-4 py-3 text-right">Demand Overlap</th>
+                <th className="px-4 py-3">{t('infra.region', 'Region')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.roadAccess', 'Road Access')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.waterSupply', 'Water Supply')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.healthcare', 'Healthcare')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.education', 'Education')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.wasteMgmt', 'Waste Mgmt')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.electricity', 'Electricity')}</th>
+                <th className="px-3 py-3 text-center">{t('infra.transit', 'Transit')}</th>
+                <th className="px-4 py-3 text-right">{t('infra.demandOverlap', 'Demand Overlap')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-normal">
@@ -214,7 +216,7 @@ export const InfrastructureView: React.FC = () => {
                       <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                         demandIntensity > 25 ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {demandIntensity > 25 ? 'Very High Demand' : 'Moderate Demand'}
+                        {demandIntensity > 25 ? t('infra.veryHighDemand', 'Very High Demand') : t('infra.moderateDemand', 'Moderate Demand')}
                       </span>
                     </td>
                   </tr>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation, SupportedLanguageCode } from '../../i18n';
 import { MainTab, AuthoritySubTab } from '../../types';
 import {
   Activity,
@@ -14,7 +15,7 @@ import {
   Building2,
   TrendingUp,
   Database,
-  ShieldCheck
+  Languages
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -28,6 +29,8 @@ export const Navbar: React.FC = () => {
     availableCountries,
     isLoading
   } = useApp();
+
+  const { t, language, setLanguage, supportedLanguages } = useTranslation();
 
   return (
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
@@ -44,16 +47,16 @@ export const Navbar: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-white">CivicPulse</span>
+                <span className="font-extrabold text-base tracking-tight text-white">{t('nav.brand')}</span>
                 <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-400/30 font-mono">
                   AI
                 </span>
                 <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  Digital Public Good
+                  {t('nav.dpgBadge')}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 hidden sm:block">
-                Multilingual Civic Intelligence & Infrastructure Prioritization
+                {t('nav.subtitle')}
               </p>
             </div>
           </div>
@@ -69,7 +72,7 @@ export const Navbar: React.FC = () => {
               }`}
             >
               <Home className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Public Portal</span>
+              <span className="hidden md:inline">{t('nav.publicPortal')}</span>
             </button>
 
             <button
@@ -81,7 +84,7 @@ export const Navbar: React.FC = () => {
               }`}
             >
               <MessageSquarePlus className="w-3.5 h-3.5" />
-              <span>Share a Need</span>
+              <span>{t('nav.shareNeed')}</span>
             </button>
 
             <button
@@ -93,18 +96,40 @@ export const Navbar: React.FC = () => {
               }`}
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Authority Portal</span>
+              <span>{t('nav.authorityPortal')}</span>
             </button>
           </nav>
 
-          {/* Right Controls: Country Switcher */}
-          <div className="flex items-center gap-3">
+          {/* Right Controls: Language Selector & Country Switcher */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Dynamic Language Selector */}
+            <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-2.5 py-1.5 rounded-md border border-slate-700 text-xs transition-colors">
+              <Languages className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="hidden xl:inline text-slate-400 font-medium">
+                {t('nav.language')}:
+              </span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as SupportedLanguageCode)}
+                className="bg-transparent text-slate-100 text-xs font-semibold focus:outline-hidden cursor-pointer"
+                aria-label="Select User Interface Language"
+              >
+                {supportedLanguages.map((l) => (
+                  <option key={l.code} value={l.code} className="bg-slate-900 text-white">
+                    {l.flag} {l.nativeName} ({l.name})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Country Switcher */}
             <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1.5 rounded-md border border-slate-700 text-xs">
-              <Globe className="w-3.5 h-3.5 text-slate-400" />
+              <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <select
                 value={selectedCountry}
                 onChange={(e) => setSelectedCountry(e.target.value)}
                 className="bg-transparent text-slate-200 text-xs font-medium focus:outline-hidden cursor-pointer"
+                aria-label="Filter Country"
               >
                 {availableCountries.map((c) => {
                   const flag = c === 'India' ? '🇮🇳 ' : c === 'Brazil' ? '🇧🇷 ' : c === 'South Africa' ? '🇿🇦 ' : '🌐 ';
@@ -114,13 +139,13 @@ export const Navbar: React.FC = () => {
                     </option>
                   );
                 })}
-                <option value="All" className="bg-slate-900 text-white">🌍 All BRICS Nations</option>
+                <option value="All" className="bg-slate-900 text-white">{t('nav.allBrics')}</option>
               </select>
             </div>
 
             <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 border-l border-slate-800 pl-3">
               <span className={`w-2 h-2 rounded-full ${isLoading ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`} />
-              <span className="font-mono">{isLoading ? 'Syncing...' : 'System Active'}</span>
+              <span className="font-mono">{isLoading ? t('nav.syncing') : t('nav.systemActive')}</span>
             </div>
           </div>
         </div>
@@ -131,19 +156,19 @@ export const Navbar: React.FC = () => {
         <div className="bg-slate-950/80 border-t border-slate-800 px-4 sm:px-6 lg:px-8 py-1.5 overflow-x-auto">
           <div className="max-w-7xl mx-auto flex items-center gap-1 text-xs font-medium whitespace-nowrap">
             {[
-              { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
-              { id: 'needs', label: 'Community Needs', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-              { id: 'map', label: 'Demand Map', icon: <MapPin className="w-3.5 h-3.5" /> },
-              { id: 'infrastructure', label: 'Infrastructure', icon: <Layers className="w-3.5 h-3.5" /> },
-              { id: 'recommendations', label: 'Recommendations', icon: <Sparkles className="w-3.5 h-3.5" /> },
-              { id: 'projects', label: 'Development Projects', icon: <Building2 className="w-3.5 h-3.5" /> },
-              { id: 'insights', label: 'Insights', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-              { id: 'explorer', label: 'Data Explorer', icon: <Database className="w-3.5 h-3.5" /> }
+              { id: 'overview', label: t('nav.overview'), icon: <Layers className="w-3.5 h-3.5" /> },
+              { id: 'needs', label: t('nav.communityNeeds'), icon: <BarChart3 className="w-3.5 h-3.5" /> },
+              { id: 'map', label: t('nav.demandMap'), icon: <MapPin className="w-3.5 h-3.5" /> },
+              { id: 'infrastructure', label: t('nav.infrastructure'), icon: <Layers className="w-3.5 h-3.5" /> },
+              { id: 'recommendations', label: t('nav.recommendations'), icon: <Sparkles className="w-3.5 h-3.5" /> },
+              { id: 'projects', label: t('nav.developmentProjects'), icon: <Building2 className="w-3.5 h-3.5" /> },
+              { id: 'insights', label: t('nav.insights'), icon: <TrendingUp className="w-3.5 h-3.5" /> },
+              { id: 'explorer', label: t('nav.dataExplorer'), icon: <Database className="w-3.5 h-3.5" /> }
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setAuthoritySubTab(tab.id as AuthoritySubTab)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
                   authoritySubTab === tab.id
                     ? 'bg-blue-600 text-white font-bold shadow-2xs'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'

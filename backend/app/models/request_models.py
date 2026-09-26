@@ -57,7 +57,7 @@ class RequestAnalysisResponse(BaseModel):
 
 class VoiceTranscribeRequest(BaseModel):
     audio_base64: Optional[str] = None
-    language_hint: str = "Telugu"
+    language_hint: str = "English"
     sample_id: Optional[str] = None
 
 class VoiceTranscribeResponse(BaseModel):

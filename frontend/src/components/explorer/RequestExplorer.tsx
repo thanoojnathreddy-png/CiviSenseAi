@@ -1,120 +1,92 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CitizenRequestRecord } from '../../types';
+import { useTranslation } from '../../i18n';
 import { PriorityBadge, CategoryBadge, LanguageBadge } from '../common/Badge';
 import {
   Search,
   Filter,
   Download,
   Volume2,
-  FileText,
-  MapPin,
   Calendar,
-  Layers,
-  ArrowUpDown,
-  CheckCircle2,
-  Clock
+  Languages
 } from 'lucide-react';
 
 export const RequestExplorer: React.FC = () => {
-  const { requests, selectedCountry, regions, demographics } = useApp();
+  const {
+    requests,
+    filteredRequests,
+    selectedCategory,
+    setSelectedCategory,
+    selectedDistrict,
+    setSelectedDistrict,
+    selectedLanguage,
+    setSelectedLanguage,
+    demographics,
+    regions
+  } = useApp();
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('All');
-  const [minSeverity, setMinSeverity] = useState<number>(0);
-  const [onlyVoice, setOnlyVoice] = useState<boolean>(false);
+  const { t, supportedLanguages } = useTranslation();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [onlyVoice, setOnlyVoice] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  // Filter requests
-  const filteredRequests = useMemo(() => {
-    return requests.filter((r) => {
-      if (selectedCountry && selectedCountry !== 'All' && r.country.toLowerCase() !== selectedCountry.toLowerCase()) return false;
-      if (selectedLanguage !== 'All' && r.language.toLowerCase() !== selectedLanguage.toLowerCase()) return false;
-      if (selectedCategory !== 'All' && r.category.toLowerCase() !== selectedCategory.toLowerCase()) return false;
-      if (selectedDistrict !== 'All' && r.district.toLowerCase() !== selectedDistrict.toLowerCase()) return false;
-      if (minSeverity > 0 && r.severity < minSeverity) return false;
-      if (onlyVoice && !r.is_voice) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesText =
-          r.raw_text.toLowerCase().includes(q) ||
-          r.translated_text.toLowerCase().includes(q) ||
-          r.district.toLowerCase().includes(q) ||
-          r.request_id.toLowerCase().includes(q) ||
-          r.category.toLowerCase().includes(q);
-        if (!matchesText) return false;
-      }
-
-      return true;
-    });
-  }, [requests, selectedCountry, selectedLanguage, selectedCategory, selectedDistrict, minSeverity, onlyVoice, searchQuery]);
+  const handlePlayVoice = (reqId: string) => {
+    if (playingId === reqId) {
+      setPlayingId(null);
+    } else {
+      setPlayingId(reqId);
+      setTimeout(() => {
+        setPlayingId(null);
+      }, 3500);
+    }
+  };
 
   const handleExportCSV = () => {
-    const headers = ['Request ID', 'Created At', 'Country', 'State', 'District', 'Language', 'Is Voice', 'Category', 'Subcategory', 'Severity', 'Urgency', 'Affected Group', 'Original Text', 'English Translation'];
-    const rows = filteredRequests.map((r) => [
-      r.request_id,
-      r.created_at,
-      r.country,
-      r.state,
-      r.district,
-      r.language,
-      r.is_voice ? 'Yes' : 'No',
-      r.category,
-      r.subcategory,
-      r.severity,
-      r.urgency,
-      r.affected_group,
-      `"${r.raw_text.replace(/"/g, '""')}"`,
-      `"${r.translated_text.replace(/"/g, '""')}"`
-    ]);
+    const headers = 'ID,Date,Language,Channel,District,Category,Subcategory,Urgency,Severity,OriginalText,Translation\n';
+    const rows = filteredRequests
+      .map((r) =>
+        `"${r.request_id}","${r.created_at}","${r.language}","${r.is_voice ? 'Voice' : 'Text'}","${r.district}","${r.category}","${r.subcategory}","${r.urgency}","${r.severity}","${r.raw_text.replace(/"/g, '""')}","${r.translated_text.replace(/"/g, '""')}"`
+      )
+      .join('\n');
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `CivicPulse_Requests_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.href = url;
+    link.setAttribute('download', `civisense_requests_export_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handlePlayVoice = (reqId: string) => {
-    setPlayingId(reqId);
-    setTimeout(() => {
-      setPlayingId(null);
-    }, 4000);
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="space-y-6">
       {/* Header Banner */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              Raw Signal Intelligence
+              {t('nav.dataExplorer')}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Multilingual Citizen Submissions Grid
+              {t('home.principle1Title')}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Citizen Development Request Explorer
+            {t('explorer.title')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Full audit log of {filteredRequests.length} verified citizen inputs with audio playback, original native script, and automated English translations.
+            {t('explorer.subtitle')}
           </p>
         </div>
 
         <button
           onClick={handleExportCSV}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all self-start md:self-auto"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all self-start md:self-auto cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Export Filtered CSV Dataset</span>
+          <span>Export CSV</span>
         </button>
       </div>
 
@@ -128,7 +100,7 @@ export const RequestExplorer: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search keywords, Telugu/Hindi script, district, or ID..."
+              placeholder={t('explorer.searchPlaceholder')}
               className="w-full text-xs pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
             />
           </div>
@@ -140,11 +112,12 @@ export const RequestExplorer: React.FC = () => {
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer font-medium"
             >
-              <option value="All">All Languages</option>
-              <option value="Telugu">Telugu (తెలుగు)</option>
-              <option value="Hindi">Hindi (हिन्दी)</option>
-              <option value="English">English</option>
-              <option value="Portuguese">Portuguese (Português)</option>
+              <option value="All">{t('explorer.allLanguages')}</option>
+              {supportedLanguages.map((l) => (
+                <option key={l.code} value={l.name}>
+                  {l.flag} {l.nativeName} ({l.name})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -155,8 +128,8 @@ export const RequestExplorer: React.FC = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer font-medium"
             >
-              <option value="All">All Categories</option>
-              <option value="Transportation">Transportation</option>
+              <option value="All">{t('explorer.allCategories')}</option>
+              <option value="Transportation">Transportation & Roads</option>
               <option value="Water & Sanitation">Water & Sanitation</option>
               <option value="Healthcare">Healthcare</option>
               <option value="Education">Education</option>
@@ -171,7 +144,7 @@ export const RequestExplorer: React.FC = () => {
               onChange={(e) => setSelectedDistrict(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden cursor-pointer font-medium"
             >
-              <option value="All">All Districts</option>
+              <option value="All">{t('dashboard.allDistricts')}</option>
               {(regions.length > 0 ? regions : demographics).map((r) => (
                 <option key={r.district} value={r.district}>
                   {r.district} ({r.state})
@@ -190,13 +163,13 @@ export const RequestExplorer: React.FC = () => {
               onChange={(e) => setOnlyVoice(e.target.checked)}
               className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
             />
-            <span>Show Voice Submissions Only (🎙️)</span>
+            <span>{t('voice.title')} (🎙️)</span>
           </label>
 
           <span className="text-slate-300">|</span>
 
           <span className="text-slate-500 font-mono text-[11px]">
-            Showing {filteredRequests.length} of {requests.length} total records
+            {filteredRequests.length} {t('common.records')}
           </span>
         </div>
       </div>
@@ -207,12 +180,12 @@ export const RequestExplorer: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3">ID & Date</th>
-                <th className="px-4 py-3">Language & Channel</th>
-                <th className="px-4 py-3">Citizen Request (Raw & Translated)</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Severity & Urgency</th>
+                <th className="px-4 py-3">{t('explorer.id')} & {t('explorer.date')}</th>
+                <th className="px-4 py-3">{t('extractor.language')}</th>
+                <th className="px-4 py-3">{t('explorer.voiceTextInput')}</th>
+                <th className="px-4 py-3">{t('explorer.district')}</th>
+                <th className="px-4 py-3">{t('explorer.sector')}</th>
+                <th className="px-4 py-3">{t('explorer.urgency')}</th>
                 <th className="px-4 py-3">Audio</th>
               </tr>
             </thead>
@@ -272,7 +245,7 @@ export const RequestExplorer: React.FC = () => {
                       {req.is_voice ? (
                         <button
                           onClick={() => handlePlayVoice(req.request_id)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all border ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all border cursor-pointer ${
                             isPlaying
                               ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                               : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border-slate-200'

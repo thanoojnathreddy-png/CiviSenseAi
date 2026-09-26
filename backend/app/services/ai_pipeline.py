@@ -115,6 +115,16 @@ DEMO_TRANSLATIONS = {
 # Voice Sample Registry for Interactive Demo Audio
 DEMO_VOICE_SAMPLES = [
     {
+        "sample_id": "VOICE-ENG-01",
+        "title": "Hospital Emergency Power & Ambulance Deficit (English)",
+        "language": "English",
+        "district": "Anantapur",
+        "state": "Andhra Pradesh",
+        "duration": 13.0,
+        "transcript": "The Community Health Centre in Kalyanadurg suffers 6-hour daily power cuts with no generator backup. Oxygen concentrators and baby warmers stop working.",
+        "category": "Healthcare"
+    },
+    {
         "sample_id": "VOICE-TEL-01",
         "title": "Road Washout & School Cutoff (Telugu)",
         "language": "Telugu",
@@ -135,14 +145,54 @@ DEMO_VOICE_SAMPLES = [
         "category": "Water & Sanitation"
     },
     {
-        "sample_id": "VOICE-ENG-01",
-        "title": "Hospital Emergency Power & Ambulance Deficit (English)",
-        "language": "English",
-        "district": "Anantapur",
-        "state": "Andhra Pradesh",
-        "duration": 13.0,
-        "transcript": "The Community Health Centre in Kalyanadurg suffers 6-hour daily power cuts with no generator backup. Oxygen concentrators and baby warmers stop working.",
+        "sample_id": "VOICE-TAM-01",
+        "title": "Rural Road Damage & Bridge Risk (Tamil)",
+        "language": "Tamil",
+        "district": "Madurai",
+        "state": "Tamil Nadu",
+        "duration": 13.5,
+        "transcript": "எங்கள் கிராமத்தில் சாலை மிகவும் சேதமடைந்துள்ளது. மழைக்காலத்தில் பள்ளி குழந்தைகள் செல்ல சிரமப்படுகின்றனர்.",
+        "category": "Transportation"
+    },
+    {
+        "sample_id": "VOICE-KAN-01",
+        "title": "Drinking Water Pipeline Leakage (Kannada)",
+        "language": "Kannada",
+        "district": "Kalaburagi",
+        "state": "Karnataka",
+        "duration": 12.8,
+        "transcript": "ನಮ್ಮ ಗ್ರಾಮದಲ್ಲಿ ಕುಡಿಯುವ ನೀರಿನ ಪೈಪ್‌ಲೈನ್ ಒಡೆದು ನೀರು ಪೋಲಾಗುತ್ತಿದೆ, ಶುದ್ಧ ನೀರು ಸಿಗುತ್ತಿಲ್ಲ.",
+        "category": "Water & Sanitation"
+    },
+    {
+        "sample_id": "VOICE-MAL-01",
+        "title": "Primary Health Centre Doctor Shortage (Malayalam)",
+        "language": "Malayalam",
+        "district": "Wayanad",
+        "state": "Kerala",
+        "duration": 14.0,
+        "transcript": "ഞങ്ങളുടെ പ്രദേശത്തെ പ്രാഥമിക ആരോഗ്യ കേന്ദ്രത്തിൽ ഡോക്ടറും ആംബുലൻസ് സൗകര്യവും ലഭ്യമല്ല.",
         "category": "Healthcare"
+    },
+    {
+        "sample_id": "VOICE-MAR-01",
+        "title": "Farm Market Road Erosion (Marathi)",
+        "language": "Marathi",
+        "district": "Pune",
+        "state": "Maharashtra",
+        "duration": 13.2,
+        "transcript": "आमच्या गावातील शेतीमाल वाहतुकीचा रस्ता पावसामुळे वाहून गेला आहे, शेतकरी हवालदिल झाले आहेत.",
+        "category": "Transportation"
+    },
+    {
+        "sample_id": "VOICE-BEN-01",
+        "title": "Drinking Water Tube Well Deficit (Bengali)",
+        "language": "Bengali",
+        "district": "Bardhaman",
+        "state": "West Bengal",
+        "duration": 13.8,
+        "transcript": "আমাদের গ্রামে পানীয় জলের নলকূপগুলো নষ্ট হয়ে গেছে, দূর থেকে জল আনতে হচ্ছে।",
+        "category": "Water & Sanitation"
     },
     {
         "sample_id": "VOICE-POR-01",
@@ -163,12 +213,24 @@ class AIPipelineService:
         # Telugu Unicode range: \u0C00-\u0C7F
         if re.search(r'[\u0C00-\u0C7F]', text):
             return "Telugu"
-        # Devanagari / Hindi Unicode range: \u0900-\u097F
+        # Devanagari / Hindi & Marathi Unicode range: \u0900-\u097F
         elif re.search(r'[\u0900-\u097F]', text):
+            # Differentiate Marathi specific characters if present
+            if any(w in text for w in ["आहे", "गावात", "रस्ता", "झाले"]):
+                return "Marathi"
             return "Hindi"
         # Tamil Unicode range: \u0B80-\u0BFF
         elif re.search(r'[\u0B80-\u0BFF]', text):
             return "Tamil"
+        # Kannada Unicode range: \u0C80-\u0CFF
+        elif re.search(r'[\u0C80-\u0CFF]', text):
+            return "Kannada"
+        # Malayalam Unicode range: \u0D00-\u0D7F
+        elif re.search(r'[\u0D00-\u0D7F]', text):
+            return "Malayalam"
+        # Bengali Unicode range: \u0980-\u09FF
+        elif re.search(r'[\u0980-\u09FF]', text):
+            return "Bengali"
         # Cyrillic / Russian Unicode range: \u0400-\u04FF
         elif re.search(r'[\u0400-\u04FF]', text):
             return "Russian"
@@ -297,7 +359,7 @@ class AIPipelineService:
         )
 
     @classmethod
-    def transcribe_voice(cls, sample_id: Optional[str] = None, language_hint: str = "Telugu") -> VoiceTranscribeResponse:
+    def transcribe_voice(cls, sample_id: Optional[str] = None, language_hint: str = "English") -> VoiceTranscribeResponse:
         """Simulates/handles speech-to-text with high accuracy for hackathon demo voice recordings."""
         if sample_id:
             for s in DEMO_VOICE_SAMPLES:
@@ -309,19 +371,21 @@ class AIPipelineService:
                         duration_seconds=s["duration"]
                     )
         
-        # Default sample based on language hint
-        if language_hint.lower() == "telugu":
-            sample = DEMO_VOICE_SAMPLES[0]
-        elif language_hint.lower() == "hindi":
-            sample = DEMO_VOICE_SAMPLES[1]
-        elif language_hint.lower() == "portuguese":
-            sample = DEMO_VOICE_SAMPLES[3]
-        else:
-            sample = DEMO_VOICE_SAMPLES[2]
+        # Match sample based on language hint
+        lang_lower = language_hint.lower()
+        matched = None
+        for s in DEMO_VOICE_SAMPLES:
+            if s["language"].lower() == lang_lower:
+                matched = s
+                break
+        
+        # Fallback to English sample
+        if not matched:
+            matched = DEMO_VOICE_SAMPLES[0]
 
         return VoiceTranscribeResponse(
-            transcribed_text=sample["transcript"],
-            detected_language=sample["language"],
+            transcribed_text=matched["transcript"],
+            detected_language=matched["language"],
             confidence=0.95,
-            duration_seconds=sample["duration"]
+            duration_seconds=matched["duration"]
         )

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n';
 import { StatCard } from '../common/StatCard';
 import { HotspotMap } from './HotspotMap';
 import { GapAnalysis } from './GapAnalysis';
@@ -10,14 +11,7 @@ import {
   Layers,
   Users,
   AlertTriangle,
-  FileSpreadsheet,
-  Filter,
   RefreshCw,
-  SlidersHorizontal,
-  Sparkles,
-  Building2,
-  Globe2,
-  Compass,
   FileCheck2,
   Search,
   XCircle,
@@ -32,7 +26,6 @@ export const DashboardOverview: React.FC = () => {
     filteredRecommendations,
     infrastructure,
     selectedCountry,
-    setSelectedCountry,
     selectedDistrict,
     setSelectedDistrict,
     selectedCategory,
@@ -53,6 +46,8 @@ export const DashboardOverview: React.FC = () => {
     demographics
   } = useApp();
 
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-8">
       {/* Executive Header & Filter Toolbar */}
@@ -61,17 +56,17 @@ export const DashboardOverview: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-                Executive Briefing
+                {t('nav.brand')} AI
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                National Infrastructure & Civic Intelligence Matrix
+                {t('dashboard.subtitle')}
               </span>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-              Public Authority Intelligence Overview
+              {t('dashboard.title')}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Cross-analyzing multilingual citizen demand across {selectedCountry === 'All' ? 'all monitored regions' : selectedCountry} to support evidence-based public infrastructure planning.
+              {t('dashboard.subtitle')} ({selectedCountry === 'All' ? t('nav.allBrics') : selectedCountry})
             </p>
           </div>
 
@@ -83,7 +78,7 @@ export const DashboardOverview: React.FC = () => {
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-all cursor-pointer"
               >
                 <XCircle className="w-3.5 h-3.5" />
-                <span>Clear Filters</span>
+                <span>{t('dashboard.resetFilters')}</span>
               </button>
             )}
 
@@ -93,7 +88,7 @@ export const DashboardOverview: React.FC = () => {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-98"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>Refresh Matrix</span>
+              <span>{t('common.filter')}</span>
             </button>
           </div>
         </div>
@@ -107,7 +102,7 @@ export const DashboardOverview: React.FC = () => {
               type="text"
               value={globalSearchQuery}
               onChange={(e) => setGlobalSearchQuery(e.target.value)}
-              placeholder="Search keyword, issue, or place..."
+              placeholder={t('needs.searchPlaceholder')}
               className="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
             />
           </div>
@@ -119,7 +114,7 @@ export const DashboardOverview: React.FC = () => {
               onChange={(e) => setSelectedDistrict(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Districts / Regions</option>
+              <option value="All">{t('dashboard.allDistricts')}</option>
               {demographics.map((d) => (
                 <option key={d.district} value={d.district}>
                   {d.district} ({d.state})
@@ -135,7 +130,7 @@ export const DashboardOverview: React.FC = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Sectors</option>
+              <option value="All">{t('dashboard.allCategories')}</option>
               <option value="Transportation">Transportation & Roads</option>
               <option value="Water & Sanitation">Water & Sanitation</option>
               <option value="Healthcare">Healthcare Facilities</option>
@@ -152,10 +147,10 @@ export const DashboardOverview: React.FC = () => {
               onChange={(e) => setSelectedPriorityFilter(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Priority Levels</option>
-              <option value="CRITICAL">Critical Priority</option>
-              <option value="HIGH">High Priority</option>
-              <option value="MEDIUM">Medium Priority</option>
+              <option value="All">{t('dashboard.allPriorities')}</option>
+              <option value="CRITICAL">{t('common.critical')}</option>
+              <option value="HIGH">{t('common.high')}</option>
+              <option value="MEDIUM">{t('common.medium')}</option>
             </select>
           </div>
 
@@ -167,10 +162,9 @@ export const DashboardOverview: React.FC = () => {
               onChange={(e) => setSelectedTimePeriod(e.target.value as TimePeriodFilter)}
               className="bg-transparent text-slate-900 text-xs font-medium focus:outline-hidden cursor-pointer w-full"
             >
-              <option value="all">All-Time Cumulative</option>
-              <option value="last_30_days">Last 30 Days</option>
-              <option value="last_90_days">Last 90 Days</option>
-              <option value="last_year">Current Fiscal Year</option>
+              <option value="all">{t('dashboard.allTime')}</option>
+              <option value="last_30_days">{t('dashboard.last30Days')}</option>
+              <option value="last_90_days">{t('dashboard.last90Days')}</option>
             </select>
           </div>
         </div>
@@ -184,10 +178,10 @@ export const DashboardOverview: React.FC = () => {
             className="cursor-pointer group transform transition-all active:scale-98"
           >
             <StatCard
-              title="Total Citizen Requests"
+              title={t('dashboard.kpiTotalRequests')}
               value={stats.total_requests.toLocaleString()}
               subtitle={`${stats.voice_requests_count.toLocaleString()} Voice • ${stats.text_requests_count.toLocaleString()} Text`}
-              trend={{ value: 'Click to explore audit log', isPositive: true }}
+              trend={{ value: t('dashboard.title'), isPositive: true }}
               icon={<Users className="w-4 h-4 text-blue-600" />}
               variant="highlight"
             />
@@ -198,10 +192,10 @@ export const DashboardOverview: React.FC = () => {
             className="cursor-pointer group transform transition-all active:scale-98"
           >
             <StatCard
-              title="High-Priority Needs"
+              title={t('dashboard.kpiCriticalNeeds')}
               value={stats.high_priority_needs_count}
-              subtitle="Demand-deficit critical overlaps"
-              trend={{ value: 'Click to view urgent clusters', isPositive: false }}
+              subtitle={t('home.highPriorityNeedsSub')}
+              trend={{ value: t('common.critical'), isPositive: false }}
               icon={<AlertTriangle className="w-4 h-4 text-rose-600" />}
               variant="critical"
             />
@@ -212,10 +206,10 @@ export const DashboardOverview: React.FC = () => {
             className="cursor-pointer group transform transition-all active:scale-98"
           >
             <StatCard
-              title="Infrastructure Gaps"
+              title={t('dashboard.kpiInfraGaps')}
               value={stats.critical_infra_gaps_count}
-              subtitle="Sectors scoring < 40/100 index"
-              trend={{ value: 'Click to compare indicators', isPositive: true }}
+              subtitle={t('home.infraGapsSub')}
+              trend={{ value: t('map.infraDeficit'), isPositive: true }}
               icon={<Layers className="w-4 h-4 text-amber-600" />}
               variant="default"
             />
@@ -226,10 +220,10 @@ export const DashboardOverview: React.FC = () => {
             className="cursor-pointer group transform transition-all active:scale-98"
           >
             <StatCard
-              title="Areas Under Review"
+              title={t('dashboard.kpiUnderReview')}
               value={stats.areas_under_review_count}
-              subtitle="Policy recommendations ready"
-              trend={{ value: 'Click to review decision briefs', isPositive: true }}
+              subtitle={t('home.areasUnderReviewSub')}
+              trend={{ value: t('nav.recommendations'), isPositive: true }}
               icon={<FileCheck2 className="w-4 h-4 text-emerald-600" />}
               variant="default"
             />

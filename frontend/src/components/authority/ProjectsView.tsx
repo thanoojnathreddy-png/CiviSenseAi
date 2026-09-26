@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GovernmentProject } from '../../types';
 import { CategoryBadge } from '../common/Badge';
+import { useTranslation } from '../../i18n';
 import {
   Building2,
   DollarSign,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 export const ProjectsView: React.FC = () => {
+  const { t } = useTranslation();
   const {
     filteredProjects,
     selectedCountry,
@@ -47,23 +49,23 @@ export const ProjectsView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              Public Works Registry
+              {t('projects.tagRegistry', 'Public Works Registry')}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Existing & Planned Development Allocations
+              {t('projects.tagAllocations', 'Existing & Planned Development Allocations')}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Government Development Projects
+            {t('projects.mainTitle', 'Government Development Projects')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Cross-referencing ongoing public works against citizen demand to identify coverage gaps and prevent duplicative infrastructure outlays.
+            {t('projects.mainSubtitle', 'Cross-referencing ongoing public works against citizen demand to identify coverage gaps and prevent duplicative infrastructure outlays.')}
           </p>
         </div>
 
         <div className="text-right hidden sm:block">
-          <span className="text-xs text-slate-500 block">Active Projects Monitored</span>
-          <span className="text-xl font-extrabold font-mono text-slate-900">{displayedProjects.length} Public Works</span>
+          <span className="text-xs text-slate-500 block">{t('projects.monitored', 'Active Projects Monitored')}</span>
+          <span className="text-xl font-extrabold font-mono text-slate-900">{displayedProjects.length} {t('projects.publicWorks', 'Public Works')}</span>
         </div>
       </div>
 
@@ -76,7 +78,7 @@ export const ProjectsView: React.FC = () => {
               type="text"
               value={globalSearchQuery}
               onChange={(e) => setGlobalSearchQuery(e.target.value)}
-              placeholder="Search project title, agency, or district..."
+              placeholder={t('projects.searchPlaceholder', 'Search project title, agency, or district...')}
               className="w-full text-xs pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden"
             />
           </div>
@@ -87,11 +89,11 @@ export const ProjectsView: React.FC = () => {
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Statuses</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Delayed">Delayed</option>
-              <option value="Completed">Completed</option>
-              <option value="Approved">Approved</option>
+              <option value="All">{t('projects.allStatuses', 'All Statuses')}</option>
+              <option value="In Progress">{t('projects.inProgress', 'In Progress')}</option>
+              <option value="Delayed">{t('projects.delayed', 'Delayed')}</option>
+              <option value="Completed">{t('projects.completed', 'Completed')}</option>
+              <option value="Approved">{t('projects.approved', 'Approved')}</option>
             </select>
           </div>
 
@@ -101,7 +103,7 @@ export const ProjectsView: React.FC = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
             >
-              <option value="All">All Sectors</option>
+              <option value="All">{t('projects.allSectors', 'All Sectors')}</option>
               <option value="Transportation">Transportation</option>
               <option value="Water & Sanitation">Water & Sanitation</option>
               <option value="Healthcare">Healthcare</option>
@@ -112,7 +114,7 @@ export const ProjectsView: React.FC = () => {
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                title="Reset Filters"
+                title={t('dashboard.resetFilters', 'Reset Filters')}
                 className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
               >
                 <XCircle className="w-4 h-4" />
@@ -151,14 +153,14 @@ export const ProjectsView: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-slate-600 font-normal">
-                  <span className="font-semibold text-slate-700">Agency:</span> {proj.implementing_agency}
+                  <span className="font-semibold text-slate-700">{t('projects.agency', 'Agency:')}</span> {proj.implementing_agency}
                 </p>
               </div>
 
               {/* Progress Bar */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                  <span>Physical Completion</span>
+                  <span>{t('projects.physicalCompletion', 'Physical Completion')}</span>
                   <span className="font-mono">{proj.completion_percentage}%</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -174,17 +176,17 @@ export const ProjectsView: React.FC = () => {
               {/* Metrics Row */}
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Allocated Budget</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-medium block">{t('projects.allocatedBudget', 'Allocated Budget')}</span>
                   <span className="font-bold text-slate-900 font-mono text-xs">₹{proj.budget_allocated_inr_cr} Cr</span>
                   <span className="text-[10px] text-slate-400 block font-mono">(${proj.budget_allocated_usd_m}M)</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Target Reach</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-medium block">{t('projects.targetReach', 'Target Reach')}</span>
                   <span className="font-bold text-slate-900 font-mono text-xs">~{proj.target_population.toLocaleString()}</span>
-                  <span className="text-[10px] text-slate-400 block">residents</span>
+                  <span className="text-[10px] text-slate-400 block">{t('projects.residents', 'residents')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Target Date</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-medium block">{t('projects.targetDate', 'Target Date')}</span>
                   <span className="font-bold text-slate-900 font-mono text-xs">{proj.target_completion_date}</span>
                 </div>
               </div>

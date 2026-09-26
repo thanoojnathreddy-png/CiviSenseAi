@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { I18nProvider, useTranslation } from './i18n';
 import { Navbar } from './components/common/Navbar';
 import { HomePage } from './components/home/HomePage';
 import { CitizenPortal } from './components/citizen/CitizenPortal';
@@ -12,7 +13,7 @@ import { RequestExplorer } from './components/explorer/RequestExplorer';
 import { HotspotMap } from './components/dashboard/HotspotMap';
 import { RecommendationsList } from './components/dashboard/RecommendationsList';
 import { RecommendationModal } from './components/dashboard/RecommendationModal';
-import { Sparkles, ShieldCheck, Globe2 } from 'lucide-react';
+import { Sparkles, ShieldCheck } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
@@ -25,6 +26,8 @@ const AppContent: React.FC = () => {
     liveNotification,
     setLiveNotification
   } = useApp();
+
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
@@ -43,7 +46,7 @@ const AppContent: React.FC = () => {
               onClick={() => setLiveNotification(null)}
               className="text-slate-400 hover:text-white text-xs underline ml-4 cursor-pointer"
             >
-              Dismiss
+              {t('common.dismiss')}
             </button>
           </div>
         </div>
@@ -64,17 +67,17 @@ const AppContent: React.FC = () => {
                 <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-                      Geospatial Intelligence
+                      {t('nav.brand')} AI
                     </span>
                     <span className="text-xs text-slate-500 font-medium">
-                      Multi-Layer Demand Mapping
+                      {t('map.compositePriority')}
                     </span>
                   </div>
                   <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-                    Demand Hotspots & Infrastructure Gaps Map
+                    {t('map.title')}
                   </h1>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Explore geographic clusters of citizen requests, compare against regional infrastructure deficits, and inspect live district diagnostics.
+                    {t('dashboard.subtitle')}
                   </p>
                 </div>
                 <HotspotMap hotspots={hotspots} />
@@ -110,18 +113,18 @@ const AppContent: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-blue-600" />
-            <span className="font-semibold text-slate-800">CivicPulse AI</span>
-            <span>• An Open Digital Public Good Platform</span>
+            <span className="font-semibold text-slate-800">{t('nav.brand')} AI</span>
+            <span>• {t('home.principle1Title')}</span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px] text-slate-400 flex-wrap justify-center">
-            <span>Evidence-Based Decision Support</span>
+            <span>{t('home.step3Title')}</span>
             <span>•</span>
-            <span>Multilingual Speech-to-Text</span>
+            <span>{t('home.step1Title')}</span>
             <span>•</span>
-            <span>UN SDG 9 / 11 / 6 Alignment</span>
+            <span>{t('home.principle2Title')}</span>
             <span>•</span>
-            <span>Human-in-the-Loop Governance</span>
+            <span>{t('home.govTitle')}</span>
           </div>
         </div>
       </footer>
@@ -131,9 +134,11 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <I18nProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </I18nProvider>
   );
 };
 

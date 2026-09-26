@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AIPriorityRecommendation } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { PriorityBadge, CategoryBadge } from '../common/Badge';
+import { useTranslation } from '../../i18n';
 import {
   Sparkles,
   ArrowRight,
@@ -20,6 +21,7 @@ interface RecommendationsListProps {
 }
 
 export const RecommendationsList: React.FC<RecommendationsListProps> = ({ recommendations }) => {
+  const { t } = useTranslation();
   const { setSelectedRecModal } = useApp();
 
   return (
@@ -29,22 +31,22 @@ export const RecommendationsList: React.FC<RecommendationsListProps> = ({ recomm
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-              Decision Support
+              {t('recommendations.tagDecisionSupport', 'Decision Support')}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Explainable Public Works Prioritization
+              {t('recommendations.tagPrioritization', 'Explainable Public Works Prioritization')}
             </span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Prioritized Public Infrastructure Recommendations
+            {t('recommendations.mainTitle', 'Prioritized Public Infrastructure Recommendations')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Transparent scoring cross-referencing citizen demand intensity, official infrastructure deficits, and active public projects.
+            {t('recommendations.mainSubtitle', 'Transparent scoring cross-referencing citizen demand intensity, official infrastructure deficits, and active public projects.')}
           </p>
         </div>
 
         <span className="text-xs font-mono text-slate-500 font-semibold bg-white px-2.5 py-1 rounded border border-slate-200 self-start sm:self-auto">
-          {recommendations.length} Actionable Interventions
+          {recommendations.length} {t('recommendations.actionableInterventions', 'Actionable Interventions')}
         </span>
       </div>
 
@@ -89,28 +91,28 @@ export const RecommendationsList: React.FC<RecommendationsListProps> = ({ recomm
               {/* Factors Summary Row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Citizen Signals</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('recommendations.citizenSignals', 'Citizen Signals')}</span>
                   <span className="font-bold text-slate-800 font-mono">
-                    {rec.citizen_requests_count.toLocaleString()} requests
+                    {rec.citizen_requests_count.toLocaleString()} {t('recommendations.requests', 'requests')}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Affected Pop</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('recommendations.affectedPop', 'Affected Pop')}</span>
                   <span className="font-bold text-slate-800 font-mono">
                     ~{rec.affected_population_estimate.toLocaleString()}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Infra Score</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('recommendations.infraScore', 'Infra Score')}</span>
                   <span className="font-bold text-rose-600 font-mono">
                     {rec.infrastructure_index_score.toFixed(0)} / 100
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Suggested Outlay</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('recommendations.suggestedOutlay', 'Suggested Outlay')}</span>
                   <span className="font-bold text-slate-900 font-mono">
                     ₹{rec.suggested_intervention.estimated_cost_inr_cr} Cr
                   </span>

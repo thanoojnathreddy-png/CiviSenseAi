@@ -12,6 +12,7 @@ import {
 import { InfrastructureIndex, AIPriorityRecommendation } from '../../types';
 import { PriorityBadge } from '../common/Badge';
 import { BarChart3, AlertCircle } from 'lucide-react';
+import { useTranslation } from '../../i18n';
 
 interface GapAnalysisProps {
   infrastructure: InfrastructureIndex[];
@@ -22,6 +23,7 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
   infrastructure,
   recommendations
 }) => {
+  const { t } = useTranslation();
   const [metricMode, setMetricMode] = useState<'index_vs_demand' | 'critical_deficits'>('index_vs_demand');
 
   // Format data for chart
@@ -32,11 +34,11 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
 
     return {
       district: infra.district,
-      'Road Index (0-100)': infra.road_index,
-      'Water Index (0-100)': infra.water_index,
-      'Health Index (0-100)': infra.healthcare_index,
-      'Infra Deficit (100 - Avg)': Math.round(100 - ((infra.road_index + infra.water_index + infra.healthcare_index) / 3)),
-      'Citizen Demand Index': Math.min(100, Math.round(totalRequests * 2.6 + 15)),
+      [t('gap.roadIndex', 'Road Index (0-100)')]: infra.road_index,
+      [t('gap.waterIndex', 'Water Index (0-100)')]: infra.water_index,
+      [t('gap.healthIndex', 'Health Index (0-100)')]: infra.healthcare_index,
+      [t('gap.infraDeficit', 'Infra Deficit (100 - Avg)')]: Math.round(100 - ((infra.road_index + infra.water_index + infra.healthcare_index) / 3)),
+      [t('gap.citizenDemandIndex', 'Citizen Demand Index')]: Math.min(100, Math.round(totalRequests * 2.6 + 15)),
       priorityScore: avgScore
     };
   });
@@ -48,11 +50,11 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-blue-600" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Infrastructure Gap vs. Citizen Demand Matrix
+              {t('gap.title', 'Infrastructure Gap vs. Citizen Demand Matrix')}
             </h2>
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            Cross-comparing official infrastructure benchmarks against verified citizen demand concentration
+            {t('gap.subtitle', 'Cross-comparing official infrastructure benchmarks against verified citizen demand concentration')}
           </p>
         </div>
 
@@ -60,19 +62,19 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium">
           <button
             onClick={() => setMetricMode('index_vs_demand')}
-            className={`px-2.5 py-1 rounded transition-all ${
+            className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
               metricMode === 'index_vs_demand' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Demand vs Deficit
+            {t('gap.demandVsDeficit', 'Demand vs Deficit')}
           </button>
           <button
             onClick={() => setMetricMode('critical_deficits')}
-            className={`px-2.5 py-1 rounded transition-all ${
+            className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
               metricMode === 'critical_deficits' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Sector Indices (Road/Water/Health)
+            {t('gap.sectorIndices', 'Sector Indices (Road/Water/Health)')}
           </button>
         </div>
       </div>
@@ -95,8 +97,8 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <Bar dataKey="Citizen Demand Index" fill="#2563EB" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Infra Deficit (100 - Avg)" fill="#DC2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('gap.citizenDemandIndex', 'Citizen Demand Index')} fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('gap.infraDeficit', 'Infra Deficit (100 - Avg)')} fill="#DC2626" radius={[4, 4, 0, 0]} />
             </BarChart>
           ) : (
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
@@ -113,9 +115,9 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <Bar dataKey="Road Index (0-100)" fill="#64748B" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Water Index (0-100)" fill="#0284C7" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Health Index (0-100)" fill="#0D9488" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('gap.roadIndex', 'Road Index (0-100)')} fill="#64748B" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('gap.waterIndex', 'Water Index (0-100)')} fill="#0284C7" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('gap.healthIndex', 'Health Index (0-100)')} fill="#0D9488" radius={[4, 4, 0, 0]} />
             </BarChart>
           )}
         </ResponsiveContainer>
@@ -125,7 +127,7 @@ export const GapAnalysis: React.FC<GapAnalysisProps> = ({
       <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs flex items-center gap-2.5">
         <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
         <span className="text-slate-700 leading-relaxed text-[11px]">
-          <strong>AI Gap Correlation:</strong> Districts like <span className="font-semibold text-slate-900">Warangal (Road Deficit: 69%)</span> and <span className="font-semibold text-slate-900">Adilabad & Yavatmal (Water Deficit: 74%)</span> exhibit severe mismatch where citizen demand sharply exceeds official baseline capacity.
+          <strong>{t('gap.aiCorrelation', 'AI Gap Correlation:')}</strong> Districts like <span className="font-semibold text-slate-900">Warangal (Road Deficit: 69%)</span> and <span className="font-semibold text-slate-900">Adilabad & Yavatmal (Water Deficit: 74%)</span> exhibit severe mismatch where citizen demand sharply exceeds official baseline capacity.
         </span>
       </div>
     </div>

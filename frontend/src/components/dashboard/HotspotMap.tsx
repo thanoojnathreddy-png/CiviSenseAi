@@ -2,15 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { HotspotPoint } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n';
 import { PriorityBadge, CategoryBadge } from '../common/Badge';
 import {
-  Layers,
   MapPin,
   AlertTriangle,
-  Users,
-  Building,
   ArrowRight,
-  TrendingUp,
   FileCheck2,
   Database
 } from 'lucide-react';
@@ -22,6 +19,7 @@ interface HotspotMapProps {
 
 export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
   const { setSelectedRecModal, recommendations, setSelectedDistrict, setAuthoritySubTab } = useApp();
+  const { t } = useTranslation();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -70,7 +68,6 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
     }
 
     return () => {
-      // Cleanup on unmount
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -113,16 +110,16 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
             ${point.district} (${point.state})
           </div>
           <div style="font-size: 11px; color: #475569; margin-bottom: 3px;">
-            Citizen Signals: <strong style="color: #0f172a;">${point.request_count.toLocaleString()}</strong>
+            ${t('map.popupSignals')} <strong style="color: #0f172a;">${point.request_count.toLocaleString()}</strong>
           </div>
           <div style="font-size: 11px; color: #475569; margin-bottom: 3px;">
-            Primary Sector: <strong>${point.top_category}</strong>
+            ${t('map.popupSector')} <strong>${point.top_category}</strong>
           </div>
           <div style="font-size: 11px; color: #475569; margin-bottom: 4px;">
-            Infra Deficit: <strong style="color: #e11d48;">${point.infrastructure_deficit_index.toFixed(0)}/100</strong>
+            ${t('map.popupDeficit')} <strong style="color: #e11d48;">${point.infrastructure_deficit_index.toFixed(0)}/100</strong>
           </div>
           <div style="font-size: 11px; color: #1e40af; font-weight: 700; border-top: 1px solid #f1f5f9; padding-top: 4px;">
-            Priority Score: ${point.composite_priority_score}/100
+            ${t('map.popupPriorityScore')} ${point.composite_priority_score}/100
           </div>
         </div>
       `;
@@ -141,7 +138,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
         duration: 1.2
       });
     }
-  }, [hotspots, selectedPoint, activeLayer]);
+  }, [hotspots, selectedPoint, activeLayer, t]);
 
   const handleOpenRec = (district: string) => {
     const matched = recommendations.find((r) => r.district.toLowerCase() === district.toLowerCase());
@@ -162,7 +159,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-blue-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-            Geospatial Demand Clusters & Infrastructure Deficit Overlay
+            {t('map.title')}
           </h3>
         </div>
 
@@ -175,7 +172,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               activeLayer === 'combined' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Composite Priority
+            {t('map.compositePriority')}
           </button>
           <button
             type="button"
@@ -184,7 +181,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               activeLayer === 'demand' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Citizen Demand
+            {t('map.citizenDemand')}
           </button>
           <button
             type="button"
@@ -193,7 +190,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               activeLayer === 'deficit' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Infra Deficit
+            {t('map.infraDeficit')}
           </button>
         </div>
       </div>
@@ -206,19 +203,21 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
 
           {/* Map Legend Overlay */}
           <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-xs p-2.5 rounded-lg border border-slate-200 shadow-sm z-20 text-[11px] space-y-1">
-            <span className="font-bold text-slate-700 block uppercase tracking-wider text-[10px]">Priority Severity</span>
+            <span className="font-bold text-slate-700 block uppercase tracking-wider text-[10px]">
+              {t('map.prioritySeverity')}
+            </span>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
-                <span className="text-slate-600">Critical (&gt;85)</span>
+                <span className="text-slate-600">{t('map.criticalLabel')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
-                <span className="text-slate-600">High (70-85)</span>
+                <span className="text-slate-600">{t('map.highLabel')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                <span className="text-slate-600">Medium</span>
+                <span className="text-slate-600">{t('map.mediumLabel')}</span>
               </div>
             </div>
           </div>
@@ -232,7 +231,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               <div className="flex items-start justify-between border-b border-slate-200 pb-3">
                 <div>
                   <span className="text-[10px] font-mono text-slate-400 block uppercase tracking-wider">
-                    Region Diagnostic Panel
+                    {t('map.regionDiagnostic')}
                   </span>
                   <h4 className="text-lg font-bold text-slate-900">{selectedPoint.district} Region</h4>
                   <span className="text-xs text-slate-500 font-medium">
@@ -245,34 +244,34 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               {/* Key Diagnostic Indicators */}
               <div className="grid grid-cols-2 gap-2.5 text-xs">
                 <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Citizen Requests</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('map.citizenRequests')}</span>
                   <span className="font-extrabold text-slate-900 font-mono text-base block mt-0.5">
                     {selectedPoint.request_count.toLocaleString()}
                   </span>
-                  <span className="text-[10px] text-slate-500">Verified signals</span>
+                  <span className="text-[10px] text-slate-500">{t('map.verifiedSignals')}</span>
                 </div>
 
                 <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Affected Reach</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('map.affectedReach')}</span>
                   <span className="font-extrabold text-slate-900 font-mono text-base block mt-0.5">
                     ~{selectedPoint.affected_population.toLocaleString()}
                   </span>
-                  <span className="text-[10px] text-slate-500">Residents impacted</span>
+                  <span className="text-[10px] text-slate-500">{t('map.residentsImpacted')}</span>
                 </div>
 
                 <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Primary Need Sector</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('map.primaryNeedSector')}</span>
                   <div className="mt-1">
                     <CategoryBadge category={selectedPoint.top_category} />
                   </div>
                 </div>
 
                 <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Infra Deficit Index</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">{t('map.infraDeficitIndex')}</span>
                   <span className="font-extrabold text-rose-600 font-mono text-base block mt-0.5">
                     {selectedPoint.infrastructure_deficit_index.toFixed(0)}/100
                   </span>
-                  <span className="text-[10px] text-slate-500">Capacity gap</span>
+                  <span className="text-[10px] text-slate-500">{t('map.capacityGap')}</span>
                 </div>
               </div>
 
@@ -280,7 +279,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
               <div className="bg-white p-3.5 rounded-lg border border-slate-200 text-xs space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Planning Evidence Summary</span>
+                  <span>{t('map.evidenceSummary')}</span>
                 </div>
                 <p className="text-slate-600 text-[11px] leading-relaxed font-normal">
                   High citizen demand intensity overlaps with a measured infrastructure deficit of {selectedPoint.infrastructure_deficit_index.toFixed(0)}/100 in the {selectedPoint.top_category} sector. {selectedPoint.active_projects_count === 0 ? 'No matching active public works currently address this deficit.' : `Currently ${selectedPoint.active_projects_count} matching works in progress.`}
@@ -295,7 +294,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-2xs transition-all cursor-pointer"
                 >
                   <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>View Detailed Policy Analysis</span>
+                  <span>{t('map.viewPolicyAnalysis')}</span>
                   <ArrowRight className="w-3.5 h-3.5 ml-auto" />
                 </button>
 
@@ -305,14 +304,14 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
                   className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
                 >
                   <Database className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Inspect Underlying Citizen Signals</span>
+                  <span>{t('map.inspectSignals')}</span>
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400 space-y-2">
               <MapPin className="w-8 h-8 text-slate-300" />
-              <span className="text-xs font-medium">Click on any cluster on the map to inspect regional diagnostics</span>
+              <span className="text-xs font-medium">{t('map.clickClusterHint')}</span>
             </div>
           )}
         </div>
