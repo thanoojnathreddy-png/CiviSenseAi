@@ -47,12 +47,26 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ hotspots }) => {
         scrollWheelZoom: false
       });
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
-      }).addTo(map);
+      const cartoKey = import.meta.env.VITE_CARTO_API_KEY;
+      if (cartoKey) {
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${cartoKey}`, {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://carto.com/" target="_blank" rel="noopener noreferrer">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(map);
+      } else {
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(map);
+      }
 
       layerGroupRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
+
+      // Ensure tiles render completely after layout mount
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 250);
     }
 
     return () => {
