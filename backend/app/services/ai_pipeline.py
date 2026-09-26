@@ -231,15 +231,15 @@ class AIPipelineService:
         # Bengali Unicode range: \u0980-\u09FF
         elif re.search(r'[\u0980-\u09FF]', text):
             return "Bengali"
-        # Cyrillic / Russian Unicode range: \u0400-\u04FF
-        elif re.search(r'[\u0400-\u04FF]', text):
-            return "Russian"
-        # CJK / Chinese: \u4E00-\u9FFF
-        elif re.search(r'[\u4E00-\u9FFF]', text):
-            return "Chinese"
-        # Portuguese specific accents or words
-        elif any(w in text.lower() for w in ["não", "ponte", "escola", "água", "cidade", "saúde", "ônibus"]):
-            return "Portuguese"
+        # Gujarati Unicode range: \u0A80-\u0AFF
+        elif re.search(r'[\u0A80-\u0AFF]', text):
+            return "Gujarati"
+        # Punjabi (Gurmukhi) Unicode range: \u0A00-\u0A7F
+        elif re.search(r'[\u0A00-\u0A7F]', text):
+            return "Punjabi"
+        # Odia Unicode range: \u0B00-\u0B7F
+        elif re.search(r'[\u0B00-\u0B7F]', text):
+            return "Odia"
         else:
             return "English"
 
@@ -276,8 +276,22 @@ class AIPipelineService:
                 return f"Citizen reports frequent power outages and grid failure: '{clean_text}'"
             return f"Citizen developmental request (Hindi translated): '{clean_text}'"
             
-        elif detected_lang == "Portuguese":
-            return f"Citizen infrastructure report (Portuguese translated): '{clean_text}'"
+        elif detected_lang == "Tamil":
+            return f"Citizen infrastructure report (Tamil translated): '{clean_text}'"
+        elif detected_lang == "Kannada":
+            return f"Citizen infrastructure report (Kannada translated): '{clean_text}'"
+        elif detected_lang == "Malayalam":
+            return f"Citizen infrastructure report (Malayalam translated): '{clean_text}'"
+        elif detected_lang == "Marathi":
+            return f"Citizen infrastructure report (Marathi translated): '{clean_text}'"
+        elif detected_lang == "Bengali":
+            return f"Citizen infrastructure report (Bengali translated): '{clean_text}'"
+        elif detected_lang == "Gujarati":
+            return f"Citizen infrastructure report (Gujarati translated): '{clean_text}'"
+        elif detected_lang == "Punjabi":
+            return f"Citizen infrastructure report (Punjabi translated): '{clean_text}'"
+        elif detected_lang == "Odia":
+            return f"Citizen infrastructure report (Odia translated): '{clean_text}'"
 
         return clean_text
 

@@ -1,4 +1,15 @@
-export type SupportedLanguageCode = 'en' | 'te' | 'hi' | 'ta' | 'kn' | 'ml' | 'mr' | 'bn' | 'pt';
+export type SupportedLanguageCode =
+  | 'en'
+  | 'hi'
+  | 'te'
+  | 'ta'
+  | 'kn'
+  | 'ml'
+  | 'mr'
+  | 'bn'
+  | 'gu'
+  | 'pa'
+  | 'or';
 
 export interface LanguageOption {
   code: SupportedLanguageCode;

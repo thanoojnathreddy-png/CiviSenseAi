@@ -35,17 +35,19 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ stats }) => {
     percentage: Math.round((value / stats.total_requests) * 100)
   }));
 
-  // Language Breakdown Colors
+  // Language Breakdown Colors (Indian Languages)
   const langColors: Record<string, string> = {
     Telugu: '#2563EB',
     Hindi: '#0D9488',
     English: '#64748B',
-    Portuguese: '#D97706',
     Tamil: '#7C3AED',
     Kannada: '#EA580C',
     Malayalam: '#059669',
     Marathi: '#DB2777',
-    Bengali: '#CA8A04'
+    Bengali: '#CA8A04',
+    Gujarati: '#E11D48',
+    Punjabi: '#0284C7',
+    Odia: '#16A34A'
   };
 
   const langData = Object.entries(stats.language_distribution || {}).map(([name, value]) => ({

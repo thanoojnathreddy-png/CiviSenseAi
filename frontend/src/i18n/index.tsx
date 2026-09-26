@@ -11,30 +11,36 @@ import kn from './locales/kn.json';
 import ml from './locales/ml.json';
 import mr from './locales/mr.json';
 import bn from './locales/bn.json';
-import pt from './locales/pt.json';
+import gu from './locales/gu.json';
+import pa from './locales/pa.json';
+import or from './locales/or.json';
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: 'en', name: 'English', nativeName: 'English', speechLang: 'en-US', flag: '🇬🇧' },
-  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', speechLang: 'te-IN', flag: '🇮🇳' },
+  { code: 'en', name: 'English', nativeName: 'English (India)', speechLang: 'en-IN', flag: '🇮🇳' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', speechLang: 'hi-IN', flag: '🇮🇳' },
+  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', speechLang: 'te-IN', flag: '🇮🇳' },
   { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', speechLang: 'ta-IN', flag: '🇮🇳' },
   { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', speechLang: 'kn-IN', flag: '🇮🇳' },
   { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', speechLang: 'ml-IN', flag: '🇮🇳' },
   { code: 'mr', name: 'Marathi', nativeName: 'मराठी', speechLang: 'mr-IN', flag: '🇮🇳' },
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', speechLang: 'bn-IN', flag: '🇮🇳' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português', speechLang: 'pt-BR', flag: '🇧🇷' }
+  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', speechLang: 'gu-IN', flag: '🇮🇳' },
+  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', speechLang: 'pa-IN', flag: '🇮🇳' },
+  { code: 'or', name: 'Odia', nativeName: 'ଓଡ଼ିଆ', speechLang: 'or-IN', flag: '🇮🇳' }
 ];
 
 const DICTIONARIES: Record<SupportedLanguageCode, TranslationDictionary> = {
   en,
-  te,
   hi,
+  te,
   ta,
   kn,
   ml,
   mr,
   bn,
-  pt
+  gu,
+  pa,
+  or
 };
 
 export const STORAGE_KEY = 'civisense_ui_language';

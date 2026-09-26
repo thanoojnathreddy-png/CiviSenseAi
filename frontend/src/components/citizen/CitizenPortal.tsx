@@ -141,10 +141,34 @@ export const CitizenPortal: React.FC = () => {
         text: 'বর্ষার জলে গ্রামের কাঁচা রাস্তা ভেঙে গেছে, অ্যাম্বুলেন্স আসার কোনো উপায় নেই।'
       }
     ],
-    Portuguese: [
+    Gujarati: [
       {
-        label: 'Queda de Ponte Rural',
-        text: 'A ponte de madeira que liga nossa comunidade rural à cidade principal está desabando. O ônibus escolar não consegue passar.'
+        label: 'ગ્રામીણ રસ્તાનું ધોવાણ (Rural Road Washout)',
+        text: 'ચોમાસાના વરસાદમાં અમારા ગામનો મુખ્ય રસ્તો તૂટી ગયો છે, વાહનવ્યવહાર અને એમ્બ્યુલન્સ આવી શકતી નથી.'
+      },
+      {
+        label: 'પીવાના પાણીની તંગી (Drinking Water Supply)',
+        text: 'અમારા વિસ્તારમાં પાણીની પાઇપલાઇન લીક થઈ ગઈ છે અને પીવાના શુદ્ધ પાણીની ગંભીર સમસ્યા ઊભી થઈ છે.'
+      }
+    ],
+    Punjabi: [
+      {
+        label: 'ਸਿਹਤ ਕੇਂਦਰ ਵਿੱਚ ਦਵਾਈਆਂ ਦੀ ਘਾਟ (Health Centre Deficit)',
+        text: 'ਸਾਡੇ ਪਿੰਡ ਦੇ ਸਰਕਾਰੀ ਸਿਹਤ ਕੇਂਦਰ ਵਿੱਚ ਨਾ ਕੋਈ ਡਾਕਟਰ ਹੈ ਅਤੇ ਨਾ ਹੀ ਜ਼ਰੂਰੀ ਦਵਾਈਆਂ ਉਪਲਬਧ ਹਨ।'
+      },
+      {
+        label: 'ਟੁੱਟੀ ਹੋਈ ਲਿੰਕ ਰੋਡ (Broken Link Road)',
+        text: 'ਪਿੰਡ ਨੂੰ ਮੁੱਖ ਸੜਕ ਨਾਲ ਜੋੜਨ ਵਾਲੀ ਲਿੰਕ ਰੋਡ ਪੂਰੀ ਤਰ੍ਹਾਂ ਟੁੱਟ ਚੁੱਕੀ ਹੈ, ਕਿਸਾਨਾਂ ਨੂੰ ਮੰਡੀ ਜਾਣ ਵਿੱਚ ਬਹੁਤ ਮੁਸ਼ਕਲ ਹੈ।'
+      }
+    ],
+    Odia: [
+      {
+        label: 'ପାନୀୟ ଜଳ ସମସ୍ୟା (Drinking Water Crisis)',
+        text: 'ଆମ ଗ୍ରାମରେ ଥିବା ନଳକୂପ ଗୁଡ଼ିକ ଅଚଳ ହୋଇପଡ଼ିଛି, ପିଇବା ପାଣି ପାଇଁ ଲୋକେ ବହୁତ କଷ୍ଟ ଭୋଗୁଛନ୍ତି।'
+      },
+      {
+        label: 'ଗ୍ରାମ୍ୟ ରାସ୍ତା ମରାମତି (Rural Road Repair)',
+        text: 'ବର୍ଷା ଦିନେ ମୁଖ୍ୟ ରାସ୍ତାରେ ଆଣ୍ଠୁଏ କାଦୁଅ ହେଉଛି, ପିଲାମାନେ ସ୍କୁଲ ଯାଇପାରୁ ନାହାନ୍ତି।'
       }
     ]
   };

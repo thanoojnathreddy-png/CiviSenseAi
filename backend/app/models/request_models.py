@@ -4,7 +4,7 @@ from datetime import datetime
 
 class CitizenRequestInput(BaseModel):
     text: str = Field(..., description="Raw text or transcribed voice from citizen")
-    language: str = Field(default="English", description="Input language (e.g., English, Telugu, Hindi, Tamil, Portuguese)")
+    language: str = Field(default="English", description="Input language (e.g., English, Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia)")
     country: str = "India"
     state: Optional[str] = "Telangana"
     district: Optional[str] = "Warangal"

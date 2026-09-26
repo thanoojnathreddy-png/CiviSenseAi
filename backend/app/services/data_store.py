@@ -406,10 +406,16 @@ class DataStore:
         }
 
         lang_dist = {
-            "Telugu": int(total * 0.42),
-            "Hindi": int(total * 0.31),
-            "English": int(total * 0.19),
-            "Portuguese": int(total * 0.08)
+            "Telugu": int(total * 0.32),
+            "Hindi": int(total * 0.26),
+            "English": int(total * 0.16),
+            "Tamil": int(total * 0.08),
+            "Kannada": int(total * 0.06),
+            "Marathi": int(total * 0.04),
+            "Bengali": int(total * 0.03),
+            "Malayalam": int(total * 0.02),
+            "Gujarati": int(total * 0.02),
+            "Punjabi": int(total * 0.01)
         }
 
         sev_dist = {
