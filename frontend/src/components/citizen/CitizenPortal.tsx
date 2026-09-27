@@ -262,6 +262,8 @@ export const CitizenPortal: React.FC = () => {
         message: `✅ Community need #${res.request.request_id} recorded in ${cleanDistrict}.`,
         type: 'success'
       });
+
+      // Refresh platform data directly from database
       await refreshData();
     } catch (err) {
       console.error('Submission error:', err);

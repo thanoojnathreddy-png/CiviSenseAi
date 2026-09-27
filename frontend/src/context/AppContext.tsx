@@ -134,7 +134,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         apiService.getDemographics(selectedCountry),
         apiService.getInfrastructure(selectedCountry),
         apiService.getGovernmentProjects(selectedCountry),
-        apiService.getRequests({ country: selectedCountry, limit: 200 }),
+        apiService.getRequests({ country: selectedCountry !== 'All' ? selectedCountry : undefined, limit: 500 }),
         apiService.getRegions()
       ]);
 
@@ -146,7 +146,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDemographics(demosData);
       setInfrastructure(infraData);
       setGovernmentProjects(projectsData);
+
+      // Clean up any legacy localStorage temporary submissions to avoid stale/duplicate state
+      try {
+        localStorage.removeItem('civisense_persisted_submissions');
+      } catch (e) {
+        // Ignore if storage is inaccessible
+      }
+
+      // Populate verified records directly from permanent database
       setRequests(requestsData);
+
       setRegions(regionsData);
     } catch (err) {
       console.error('Error refreshing platform data:', err);

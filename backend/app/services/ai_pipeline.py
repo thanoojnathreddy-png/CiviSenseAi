@@ -195,16 +195,37 @@ DEMO_VOICE_SAMPLES = [
         "category": "Water & Sanitation"
     },
     {
-        "sample_id": "VOICE-POR-01",
-        "title": "Rural Bridge Collapse (Portuguese / Brazil)",
-        "language": "Portuguese",
-        "district": "Jequitinhonha",
-        "state": "Minas Gerais",
-        "duration": 12.0,
-        "transcript": "A ponte de madeira que liga nossa comunidade rural à cidade principal está desabando. O ônibus escolar não consegue mais passar.",
+        "sample_id": "VOICE-GUJ-01",
+        "title": "Rural Road Washout & Connectivity (Gujarati)",
+        "language": "Gujarati",
+        "district": "Rajkot",
+        "state": "Gujarat",
+        "duration": 13.5,
+        "transcript": "ચોમાસાના વરસાદમાં અમારા ગામનો મુખ્ય રસ્તો તૂટી ગયો છે, વાહનવ્યવહાર અને એમ્બ્યુલન્સ આવી શકતી નથી.",
+        "category": "Transportation"
+    },
+    {
+        "sample_id": "VOICE-PAN-01",
+        "title": "Rural Health Clinic Doctor Deficit (Punjabi)",
+        "language": "Punjabi",
+        "district": "Amritsar",
+        "state": "Punjab",
+        "duration": 14.1,
+        "transcript": "ਸਾਡੇ ਪਿੰਡ ਦੇ ਸਰਕਾਰੀ ਸਿਹਤ ਕੇਂਦਰ ਵਿੱਚ ਨਾ ਕੋਈ ਡਾਕਟਰ ਹੈ ਅਤੇ ਨਾ ਹੀ ਜ਼ਰੂਰੀ ਦਵਾਈਆਂ ਉਪਲਬਧ ਹਨ।",
+        "category": "Healthcare"
+    },
+    {
+        "sample_id": "VOICE-ODI-01",
+        "title": "Village Road Restoration & Repair (Odia)",
+        "language": "Odia",
+        "district": "Mayurbhanj",
+        "state": "Odisha",
+        "duration": 12.9,
+        "transcript": "ଗ୍ରାମ୍ୟ ରାସ୍ତା ସମ୍ପୂର୍ଣ୍ଣ ନଷ୍ଟ ହୋଇଯାଇଛି, ବର୍ଷା ଦିନେ ଯାତାୟାତ ସମ୍ଭବ ହେଉନାହିଁ।",
         "category": "Transportation"
     }
 ]
+
 
 class AIPipelineService:
     @staticmethod

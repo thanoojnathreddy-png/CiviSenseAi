@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import copy
+import uuid
 from app.data.synthetic_seed import (
     INITIAL_DEMOGRAPHICS,
     INITIAL_INFRASTRUCTURE,
@@ -15,14 +16,87 @@ from app.models.recommendation_models import (
     ExecutiveStats
 )
 from app.services.priority_engine import PriorityEngineService
+from app.db.session import SessionLocal, init_db, is_postgres
+from app.db.models import CitizenRequestDB
+from sqlalchemy import or_, text
 
 class DataStore:
     def __init__(self):
         self.demographics: Dict[str, Dict[str, Any]] = {d["district"]: d for d in INITIAL_DEMOGRAPHICS}
         self.infrastructure: Dict[str, Dict[str, Any]] = {i["district"]: i for i in INITIAL_INFRASTRUCTURE}
         self.projects: List[Dict[str, Any]] = copy.deepcopy(INITIAL_PROJECTS)
-        self.requests: List[Dict[str, Any]] = generate_full_synthetic_requests()
+        
+        # Initialize database tables
+        init_db()
+        self._sync_database_on_startup()
         self._request_counter = len(self.requests) + 1000
+
+    def _sync_database_on_startup(self):
+        """Loads records from database; seeds baseline signals only if database is completely empty."""
+        db = SessionLocal()
+        try:
+            count = db.query(CitizenRequestDB).count()
+            if count == 0:
+                print("[DataStore] Database is empty. Seeding initial baseline signals with is_demo=True...")
+                seed_requests = generate_full_synthetic_requests()
+                db_objects = []
+                for s in seed_requests:
+                    db_obj = CitizenRequestDB(
+                        request_id=s["request_id"],
+                        created_at=s["created_at"],
+                        raw_text=s["raw_text"],
+                        translated_text=s.get("translated_text", s["raw_text"]),
+                        language=s.get("language", "English"),
+                        input_source="voice" if s.get("is_voice") else "text",
+                        country=s.get("country", "India"),
+                        state=s.get("state", "Telangana"),
+                        district=s.get("district", "Warangal"),
+                        locality=s.get("locality", "General District Area"),
+                        latitude=s.get("latitude"),
+                        longitude=s.get("longitude"),
+                        is_voice=s.get("is_voice", False),
+                        voice_duration_sec=s.get("voice_duration_sec"),
+                        category=s["category"],
+                        subcategory=s.get("subcategory"),
+                        severity=s.get("severity", 7),
+                        urgency=s.get("urgency", "High"),
+                        affected_group=s.get("affected_group", "Local Residents"),
+                        status=s.get("status", "Under Policy Review"),
+                        sentiment="Concerned",
+                        key_entities=s.get("subcategory", ""),
+                        is_demo=True
+                    )
+                    db_objects.append(db_obj)
+                db.add_all(db_objects)
+                db.commit()
+                print(f"[DataStore] Seeded {len(db_objects)} baseline records.")
+
+                # On PostgreSQL, sync primary key sequence after initial seed
+                if is_postgres:
+                    try:
+                        db.execute(text(
+                            "SELECT setval(pg_get_serial_sequence('citizen_requests', 'id'), COALESCE(MAX(id), 1)) FROM citizen_requests;"
+                        ))
+                        db.commit()
+                    except Exception as seq_err:
+                        print(f"[DataStore] Sequence sync note: {seq_err}")
+
+            # Load all requests from database (Real citizen submissions first, then latest)
+            records = (
+                db.query(CitizenRequestDB)
+                .order_by(CitizenRequestDB.is_demo.asc(), CitizenRequestDB.id.desc())
+                .all()
+            )
+            self.requests = [r.to_dict() for r in records]
+            real_count = sum(1 for r in self.requests if not r.get("is_demo"))
+            print(f"[DataStore] Loaded {len(self.requests)} requests ({real_count} verified citizen submissions) from database.")
+        except Exception as e:
+            print(f"[DataStore] Error initializing database requests: {e}")
+            db.rollback()
+            self.requests = generate_full_synthetic_requests()
+        finally:
+            db.close()
+
 
     def get_regions(self, country: Optional[str] = None) -> List[Dict[str, Any]]:
         LOCALITIES_MAP = {
@@ -77,64 +151,130 @@ class DataStore:
         limit: int = 200,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
-        filtered = self.requests
-        if country and country != "All":
-            filtered = [r for r in filtered if r.get("country", "").lower() == country.lower()]
-        if state and state != "All":
-            filtered = [r for r in filtered if r.get("state", "").lower() == state.lower()]
-        if district and district != "All":
-            filtered = [r for r in filtered if r.get("district", "").lower() == district.lower()]
-        if category and category != "All":
-            filtered = [r for r in filtered if r.get("category", "").lower() == category.lower()]
-        if language and language != "All":
-            filtered = [r for r in filtered if r.get("language", "").lower() == language.lower()]
-        if min_severity is not None:
-            filtered = [r for r in filtered if r.get("severity", 0) >= min_severity]
-        if search:
-            q = search.lower()
-            filtered = [
-                r for r in filtered
-                if q in r.get("raw_text", "").lower()
-                or q in r.get("translated_text", "").lower()
-                or q in r.get("district", "").lower()
-                or q in r.get("category", "").lower()
-                or q in r.get("subcategory", "").lower()
-            ]
-        
-        sorted_requests = sorted(filtered, key=lambda x: x.get("created_at", ""), reverse=True)
-        return sorted_requests[offset:offset + limit]
+        db = SessionLocal()
+        try:
+            query = db.query(CitizenRequestDB)
+            if country and country != "All":
+                query = query.filter(CitizenRequestDB.country.ilike(country))
+            if state and state != "All":
+                query = query.filter(CitizenRequestDB.state.ilike(state))
+            if district and district != "All":
+                query = query.filter(CitizenRequestDB.district.ilike(district))
+            if category and category != "All":
+                query = query.filter(CitizenRequestDB.category.ilike(category))
+            if language and language != "All":
+                query = query.filter(CitizenRequestDB.language.ilike(language))
+            if min_severity is not None:
+                query = query.filter(CitizenRequestDB.severity >= min_severity)
+            if search:
+                term = f"%{search.strip().lower()}%"
+                query = query.filter(
+                    or_(
+                        CitizenRequestDB.raw_text.ilike(term),
+                        CitizenRequestDB.translated_text.ilike(term),
+                        CitizenRequestDB.district.ilike(term),
+                        CitizenRequestDB.category.ilike(term),
+                        CitizenRequestDB.subcategory.ilike(term)
+                    )
+                )
+
+            # Prioritize real user submissions first (is_demo=False), then latest
+            records = (
+                query
+                .order_by(CitizenRequestDB.is_demo.asc(), CitizenRequestDB.id.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+            return [r.to_dict() for r in records]
+        except Exception as e:
+            print(f"[DataStore] Database query failed, falling back to memory: {e}")
+            filtered = self.requests
+            if country and country != "All":
+                filtered = [r for r in filtered if r.get("country", "").lower() == country.lower()]
+            if state and state != "All":
+                filtered = [r for r in filtered if r.get("state", "").lower() == state.lower()]
+            if district and district != "All":
+                filtered = [r for r in filtered if r.get("district", "").lower() == district.lower()]
+            if category and category != "All":
+                filtered = [r for r in filtered if r.get("category", "").lower() == category.lower()]
+            if language and language != "All":
+                filtered = [r for r in filtered if r.get("language", "").lower() == language.lower()]
+            if min_severity is not None:
+                filtered = [r for r in filtered if r.get("severity", 0) >= min_severity]
+            if search:
+                q = search.lower()
+                filtered = [
+                    r for r in filtered
+                    if q in r.get("raw_text", "").lower()
+                    or q in r.get("translated_text", "").lower()
+                    or q in r.get("district", "").lower()
+                    or q in r.get("category", "").lower()
+                    or q in r.get("subcategory", "").lower()
+                ]
+            sorted_requests = sorted(filtered, key=lambda x: (not x.get("is_demo", False), x.get("created_at", "")), reverse=True)
+            return sorted_requests[offset:offset + limit]
+        finally:
+            db.close()
 
     def add_request(self, req_dict: Dict[str, Any]) -> Dict[str, Any]:
         self._request_counter += 1
         state_prefix = req_dict.get("state", "IND")[:2].upper()
-        req_id = f"REQ-{state_prefix}-{self._request_counter}"
+        # Generate persistent, globally unique, auditable request ID (e.g. REQ-TE-260927-1033-A4F1)
+        time_part = datetime.now().strftime("%y%m%d%H%M%S")
+        rand_part = uuid.uuid4().hex[:4].upper()
+        req_id = f"REQ-{state_prefix}-{time_part}-{rand_part}"
+
         
         dist = req_dict.get("district", "Warangal")
         demo = self.demographics.get(dist)
         lat = req_dict.get("latitude") or (demo["latitude"] if demo else 17.9784)
         lon = req_dict.get("longitude") or (demo["longitude"] if demo else 79.5941)
 
-        record = {
-            "request_id": req_id,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "raw_text": req_dict["raw_text"],
-            "translated_text": req_dict.get("translated_text", req_dict["raw_text"]),
-            "language": req_dict.get("language", "English"),
-            "country": req_dict.get("country", "India"),
-            "state": req_dict.get("state", "Telangana"),
-            "district": dist,
-            "locality": req_dict.get("locality", "Central Community Area"),
-            "latitude": lat,
-            "longitude": lon,
-            "is_voice": req_dict.get("is_voice", False),
-            "voice_duration_sec": req_dict.get("voice_duration_sec", 12.5 if req_dict.get("is_voice") else None),
-            "category": req_dict["category"],
-            "subcategory": req_dict.get("subcategory", "General Infrastructure"),
-            "severity": req_dict.get("severity", 8),
-            "urgency": req_dict.get("urgency", "High"),
-            "affected_group": req_dict.get("affected_group", "Local Residents"),
-            "status": "Under Policy Review"
-        }
+        created_at_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Create database record
+        db = SessionLocal()
+        try:
+            db_record = CitizenRequestDB(
+                request_id=req_id,
+                created_at=created_at_str,
+                raw_text=req_dict["raw_text"],
+                translated_text=req_dict.get("translated_text", req_dict["raw_text"]),
+                language=req_dict.get("language", "English"),
+                input_source="voice" if req_dict.get("is_voice") else "text",
+                country=req_dict.get("country", "India"),
+                state=req_dict.get("state", "Telangana"),
+                district=dist,
+                locality=req_dict.get("locality", f"{dist} Community Sector"),
+                latitude=lat,
+                longitude=lon,
+                is_voice=req_dict.get("is_voice", False),
+                voice_duration_sec=req_dict.get("voice_duration_sec", 12.5 if req_dict.get("is_voice") else None),
+                category=req_dict["category"],
+                subcategory=req_dict.get("subcategory", f"{req_dict['category']} Need"),
+                severity=req_dict.get("severity", 8),
+                urgency=req_dict.get("urgency", "High"),
+                affected_group=req_dict.get("affected_group", "Local Residents"),
+                status="Under Policy Review",
+                sentiment=req_dict.get("sentiment", "Concerned"),
+                key_entities=req_dict.get("key_entities", ""),
+                is_demo=False  # Real citizen verified submission!
+            )
+            db.add(db_record)
+            db.commit()
+            db.refresh(db_record)
+            record = db_record.to_dict()
+            print(f"[DataStore] PERMANENTLY SAVED citizen request to database: {req_id} (DB ID: {db_record.id}, is_demo: False)")
+        except Exception as e:
+            print(f"[DataStore] Database save CRITICAL error: {repr(e)}")
+            db.rollback()
+            raise RuntimeError(f"Database persistence failure: {repr(e)}")
+        finally:
+            db.close()
+
+
+        # Update in-memory requests list as well
         self.requests.insert(0, record)
         return record
 

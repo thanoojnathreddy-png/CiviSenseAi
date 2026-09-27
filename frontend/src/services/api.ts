@@ -200,6 +200,26 @@ export const apiService = {
     return res.json();
   },
 
+  // Upload Recorded Audio File
+  async uploadVoiceAudio(audioBlob: Blob, languageHint?: string): Promise<{
+    transcribed_text: string;
+    detected_language: string;
+    confidence: number;
+    duration_seconds: number;
+  }> {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'citizen_voice_recording.webm');
+    if (languageHint) {
+      formData.append('language_hint', languageHint);
+    }
+    const res = await fetch(`${API_BASE}/transcribe-audio`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Failed to upload and transcribe audio file');
+    return res.json();
+  },
+
   // Voice Samples
   async getVoiceSamples(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/voice-samples`);

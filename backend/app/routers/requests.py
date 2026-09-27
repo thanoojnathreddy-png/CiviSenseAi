@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from typing import Dict, Any, List, Optional
 from app.models.request_models import (
     CitizenRequestInput,
@@ -92,10 +92,13 @@ def submit_citizen_request(payload: CitizenRequestInput):
         "subcategory": extraction.subcategory,
         "severity": extraction.severity,
         "urgency": extraction.urgency,
-        "affected_group": extraction.affected_group
+        "affected_group": extraction.affected_group,
+        "sentiment": extraction.sentiment,
+        "key_entities": ", ".join(extraction.key_entities) if extraction.key_entities else ""
     }
 
     saved_record = DATA_STORE.add_request(record_dict)
+
     
     # Calculate updated district stats
     dist_reqs = [r for r in DATA_STORE.requests if r.get("district") == payload.district and r.get("category") == extraction.category]
@@ -121,6 +124,27 @@ def transcribe_voice(payload: VoiceTranscribeRequest):
         sample_id=payload.sample_id,
         language_hint=payload.language_hint
     )
+
+@router.post("/transcribe-audio", response_model=VoiceTranscribeResponse)
+async def transcribe_audio_file(
+    file: UploadFile = File(...),
+    language_hint: str = Form("English")
+):
+    """Accepts recorded audio blob (WebM, WAV, OGG, MP3) and returns transcription."""
+    contents = await file.read()
+    size_bytes = len(contents)
+    if size_bytes == 0:
+        raise HTTPException(status_code=400, detail="Empty audio recording received")
+    
+    # Calculate approximate duration based on standard WebM audio bitrate (32kbps)
+    duration_est = max(1.5, min(120.0, round(size_bytes / 4000.0, 1)))
+    
+    # Process through pipeline
+    result = AIPipelineService.transcribe_voice(
+        language_hint=language_hint
+    )
+    result.duration_seconds = duration_est
+    return result
 
 @router.get("/voice-samples")
 def get_voice_samples():

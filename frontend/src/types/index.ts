@@ -171,6 +171,8 @@ export interface CitizenRequestRecord {
   urgency: string;
   affected_group: string;
   status: string;
+  is_demo?: boolean;
+  input_source?: string;
 }
 
 export interface AIStructuredExtraction {

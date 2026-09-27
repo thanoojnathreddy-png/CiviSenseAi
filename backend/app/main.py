@@ -25,7 +25,13 @@ app.include_router(recommendations.router)
 app.include_router(demographics.router)
 app.include_router(insights.router)
 
+@app.on_event("startup")
+def on_startup():
+    from app.db.session import init_db
+    init_db()
+
 @app.get("/")
+
 def root():
     return {
         "platform": "CivicPulse AI",
