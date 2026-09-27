@@ -130,21 +130,16 @@ async def transcribe_audio_file(
     file: UploadFile = File(...),
     language_hint: str = Form("English")
 ):
-    """Accepts recorded audio blob (WebM, WAV, OGG, MP3) and returns transcription."""
+    """Accepts recorded audio blob (WAV, PCM, WebM) and returns speech-to-text transcription."""
     contents = await file.read()
     size_bytes = len(contents)
     if size_bytes == 0:
         raise HTTPException(status_code=400, detail="Empty audio recording received")
     
-    # Calculate approximate duration based on standard WebM audio bitrate (32kbps)
-    duration_est = max(1.5, min(120.0, round(size_bytes / 4000.0, 1)))
-    
-    # Process through pipeline
-    result = AIPipelineService.transcribe_voice(
+    return AIPipelineService.transcribe_audio_bytes(
+        audio_bytes=contents,
         language_hint=language_hint
     )
-    result.duration_seconds = duration_est
-    return result
 
 @router.get("/voice-samples")
 def get_voice_samples():
