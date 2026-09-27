@@ -200,7 +200,7 @@ export const apiService = {
     return res.json();
   },
 
-  // Upload Recorded Audio File
+  // Upload Recorded Audio File with Gemini AI fallback
   async uploadVoiceAudio(audioBlob: Blob, languageHint?: string): Promise<{
     transcribed_text: string;
     detected_language: string;
@@ -208,16 +208,102 @@ export const apiService = {
     duration_seconds: number;
   }> {
     const formData = new FormData();
-    formData.append('file', audioBlob, 'citizen_voice_recording.webm');
+    const fileName = (audioBlob.type && audioBlob.type.includes('wav')) ? 'citizen_voice.wav' : 'citizen_voice.webm';
+    formData.append('file', audioBlob, fileName);
     if (languageHint) {
       formData.append('language_hint', languageHint);
     }
-    const res = await fetch(`${API_BASE}/transcribe-audio`, {
-      method: 'POST',
-      body: formData
+
+    try {
+      const res = await fetch(`${API_BASE}/transcribe-audio`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('[apiService] Backend transcribe-audio unreachable, attempting direct Gemini STT fallback:', err);
+    }
+
+    // Direct Gemini client-side fallback if backend is offline or errors
+    try {
+      return await this.transcribeAudioWithGeminiDirect(audioBlob, languageHint);
+    } catch (fallbackErr) {
+      console.error('[apiService] Both backend and direct Gemini transcription failed:', fallbackErr);
+      throw new Error('Failed to transcribe voice audio via AI');
+    }
+  },
+
+  // Direct client-side Gemini transcription fallback
+  async transcribeAudioWithGeminiDirect(audioBlob: Blob, languageHint: string = 'English'): Promise<{
+    transcribed_text: string;
+    detected_language: string;
+    confidence: number;
+    duration_seconds: number;
+  }> {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) throw new Error('No VITE_GEMINI_API_KEY configured');
+
+    // Convert blob to base64
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const b64 = result.split(',')[1] || '';
+        resolve(b64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(audioBlob);
     });
-    if (!res.ok) throw new Error('Failed to upload and transcribe audio file');
-    return res.json();
+
+    const cleanMime = (audioBlob.type || 'audio/webm').split(';')[0];
+    const prompt = (
+      `You are the multilingual speech-to-text transcriber for CivicPulse AI citizen grievances. ` +
+      `Transcribe the audio verbatim in ${languageHint} or native language. ` +
+      `If silence or no intelligible speech is detected, set transcribed_text to an empty string "". ` +
+      `Output JSON strictly: {"transcribed_text": string, "detected_language": string, "confidence": number}`
+    );
+
+    const payload = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: cleanMime, data: base64Data } },
+          { text: prompt }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        temperature: 0.1
+      }
+    };
+
+    const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    for (const model of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) continue;
+        const cleanJson = text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        return {
+          transcribed_text: (parsed.transcribed_text || '').trim(),
+          detected_language: parsed.detected_language || languageHint,
+          confidence: parsed.confidence || 0.96,
+          duration_seconds: Math.max(1, Math.round(audioBlob.size / 32000))
+        };
+      } catch (e) {
+        continue;
+      }
+    }
+    throw new Error('Direct Gemini transcription exhausted all models');
   },
 
   // Voice Samples

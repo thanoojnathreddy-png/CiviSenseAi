@@ -120,6 +120,17 @@ def submit_citizen_request(payload: CitizenRequestInput):
 @router.post("/voice-transcribe", response_model=VoiceTranscribeResponse)
 def transcribe_voice(payload: VoiceTranscribeRequest):
     """Handles audio transcription for voice submissions."""
+    if payload.audio_base64:
+        import base64
+        try:
+            audio_bytes = base64.b64decode(payload.audio_base64)
+            return AIPipelineService.transcribe_audio_bytes(
+                audio_bytes=audio_bytes,
+                language_hint=payload.language_hint or "English"
+            )
+        except Exception as e:
+            print(f"[API] Error decoding base64 audio: {e}")
+
     return AIPipelineService.transcribe_voice(
         sample_id=payload.sample_id,
         language_hint=payload.language_hint
@@ -130,7 +141,7 @@ async def transcribe_audio_file(
     file: UploadFile = File(...),
     language_hint: str = Form("English")
 ):
-    """Accepts recorded audio blob (WAV, PCM, WebM) and returns speech-to-text transcription."""
+    """Accepts recorded audio blob (WebM, WAV, MP3, OGG) and returns speech-to-text transcription via Google Gemini AI."""
     contents = await file.read()
     size_bytes = len(contents)
     if size_bytes == 0:
@@ -138,7 +149,8 @@ async def transcribe_audio_file(
     
     return AIPipelineService.transcribe_audio_bytes(
         audio_bytes=contents,
-        language_hint=language_hint
+        language_hint=language_hint,
+        mime_type=file.content_type
     )
 
 @router.get("/voice-samples")

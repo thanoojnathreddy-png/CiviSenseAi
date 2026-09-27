@@ -60,3 +60,18 @@ def test_analyze_and_submit_telugu_request():
     sub_data = res_sub.json()
     assert sub_data["status"] == "success"
     assert sub_data["request"]["category"] == "Transportation"
+
+def test_voice_transcribe_preset():
+    res = client.post("/api/voice-transcribe", json={"sample_id": "VOICE-TEL-01"})
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data["transcribed_text"]) > 0
+    assert data["detected_language"] == "Telugu"
+
+def test_transcribe_audio_upload():
+    import io
+    fake_wav = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+    files = {"file": ("test_recording.wav", io.BytesIO(fake_wav), "audio/wav")}
+    res = client.post("/api/transcribe-audio", files=files, data={"language_hint": "English"})
+    assert res.status_code == 200
+    assert "transcribed_text" in res.json()

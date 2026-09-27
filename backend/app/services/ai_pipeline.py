@@ -1,6 +1,35 @@
+import os
+import json
 import re
 from typing import Dict, Any, List, Optional
 from app.models.request_models import AIStructuredExtraction, VoiceTranscribeResponse
+
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Ensure environment variables from backend/.env are loaded
+_backend_dir = Path(__file__).resolve().parent.parent.parent
+if (_backend_dir / '.env').exists():
+    load_dotenv(dotenv_path=_backend_dir / '.env')
+else:
+    load_dotenv()
+
+_GEMINI_CLIENT = None
+
+def get_gemini_client():
+    global _GEMINI_CLIENT
+    if _GEMINI_CLIENT is not None:
+        return _GEMINI_CLIENT
+    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        return None
+    try:
+        from google import genai
+        _GEMINI_CLIENT = genai.Client(api_key=api_key)
+        return _GEMINI_CLIENT
+    except Exception as e:
+        print(f"[Gemini] genai.Client init note: {e}")
+        return None
 
 # Multilingual Vocabulary & Entity Dictionaries for BRICS & Indian Languages
 CATEGORY_KEYWORDS = {
@@ -320,6 +349,63 @@ class AIPipelineService:
     def extract_structured_data(cls, text: str, location_hint: str = "Warangal", language_override: Optional[str] = None) -> AIStructuredExtraction:
         """Extracts structured entities, category, subcategory, severity, urgency, and affected groups."""
         detected_lang = language_override or cls.detect_language(text)
+
+        # 0. Try intelligent Google Gemini extraction first if available
+        client = get_gemini_client()
+        if client and len(text.strip()) > 3:
+            try:
+                from google.genai import types
+                prompt = (
+                    f"Analyze this citizen infrastructure grievance from {location_hint}:\n"
+                    f"\"{text.strip()}\"\n\n"
+                    f"Classify and extract into JSON:\n"
+                    f"- category: must be EXACTLY one of: ['Transportation', 'Water & Sanitation', 'Healthcare', 'Education', 'Waste Management', 'Power & Energy']\n"
+                    f"- subcategory: specific infrastructure issue title\n"
+                    f"- location: mentioned locality or district (e.g. '{location_hint}')\n"
+                    f"- severity: integer from 1 to 10 based on public health and safety impact\n"
+                    f"- urgency: one of ['Critical', 'High', 'Medium', 'Low']\n"
+                    f"- affected_group: e.g. ['Students', 'Daily Commuters', 'Farmers', 'Patients', 'Women & Households', 'General Public']\n"
+                    f"- language: detected language name (e.g. '{detected_lang}')\n"
+                    f"- translated_text: accurate, fluent English translation of the complaint text\n"
+                    f"- key_entities: list of key noun phrases and entities\n"
+                    f"- sentiment: descriptive sentiment (e.g. 'Critical / Distressed' or 'Concerned')\n"
+                    f"- sentiment_score: float from -1.0 to 0.0\n"
+                    f"Output strictly valid JSON with no markdown formatting."
+                )
+
+                for model_candidate in ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                    try:
+                        resp = client.models.generate_content(
+                            model=model_candidate,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                                temperature=0.1
+                            )
+                        )
+                        raw_json = (resp.text or "").strip()
+                        if raw_json.startswith("```"):
+                            raw_json = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_json, flags=re.DOTALL).strip()
+                        data = json.loads(raw_json)
+                        if data.get("category") and data.get("translated_text"):
+                            return AIStructuredExtraction(
+                                category=data.get("category", "Transportation"),
+                                subcategory=data.get("subcategory", "General Infrastructure Need"),
+                                location=data.get("location", location_hint),
+                                severity=max(1, min(10, int(data.get("severity", 7)))),
+                                urgency=data.get("urgency", "High"),
+                                affected_group=data.get("affected_group", "General Public"),
+                                language=data.get("language", detected_lang),
+                                translated_text=data.get("translated_text", text),
+                                key_entities=data.get("key_entities", []),
+                                sentiment=data.get("sentiment", "Concerned"),
+                                sentiment_score=float(data.get("sentiment_score", -0.7))
+                            )
+                    except Exception:
+                        continue
+            except Exception as e:
+                print(f"[Gemini NLP] Fallback to rule engine: {e}")
+
         translated = cls.translate_to_english(text, detected_lang)
         combined_text = (text + " " + translated).lower()
 
@@ -426,8 +512,103 @@ class AIPipelineService:
         )
 
     @classmethod
-    def transcribe_audio_bytes(cls, audio_bytes: bytes, language_hint: str = "English") -> VoiceTranscribeResponse:
-        """Transcribes raw audio bytes (WAV/PCM) using SpeechRecognition with multilingual Indian language support."""
+    def transcribe_audio_bytes(
+        cls,
+        audio_bytes: bytes,
+        language_hint: str = "English",
+        mime_type: Optional[str] = None
+    ) -> VoiceTranscribeResponse:
+        """Transcribes raw recorded audio bytes (WebM, WAV, MP3, OGG) using Google Gemini AI, with SpeechRecognition fallback."""
+        clean_lang = (language_hint or "English").strip()
+        duration_est = max(1.0, round(len(audio_bytes) / 32000.0, 1))
+
+        # 1. Detect audio MIME type if not provided
+        detected_mime = (mime_type or "").strip().lower()
+        if not detected_mime or not detected_mime.startswith("audio/"):
+            if audio_bytes.startswith(b"RIFF"):
+                detected_mime = "audio/wav"
+            elif audio_bytes.startswith(b"\x1a\x45\xdf\xa3"):
+                detected_mime = "audio/webm"
+            elif audio_bytes.startswith(b"OggS"):
+                detected_mime = "audio/ogg"
+            elif b"ftyp" in audio_bytes[:32]:
+                detected_mime = "audio/mp4"
+            else:
+                detected_mime = "audio/webm"
+
+        # 2. Try Google Gemini API Transcription
+        client = get_gemini_client()
+        if client:
+            try:
+                from google.genai import types
+
+                part = types.Part.from_bytes(
+                    data=audio_bytes,
+                    mime_type=detected_mime
+                )
+
+                prompt = (
+                    f"You are the multilingual speech-to-text transcriber for CivicPulse AI, a digital public good citizen feedback platform. "
+                    f"The citizen spoke in {clean_lang} or another regional Indian/global language (e.g. Telugu, Hindi, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia, English). "
+                    f"Task instructions:\n"
+                    f"1. Transcribe the citizen's exact spoken words verbatim in their native language and script (e.g. Telugu script for Telugu, Devanagari script for Hindi, Latin for English).\n"
+                    f"2. Detect the spoken language.\n"
+                    f"3. If no speech is detected (only silence, ambient noise, or tone), set transcribed_text to an empty string ''.\n"
+                    f"Output strictly valid JSON with this format:\n"
+                    f'{{"transcribed_text": "<exact words spoken>", "detected_language": "<Language Name>", "confidence": 0.98}}'
+                )
+
+                # Cascade across fast & stable Gemini models
+                candidate_models = [
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.7-flash",
+                    "gemini-3.8-flash",
+                    "gemini-flash-latest"
+                ]
+
+                for model_name in candidate_models:
+                    try:
+                        resp = client.models.generate_content(
+                            model=model_name,
+                            contents=[part, prompt],
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                                temperature=0.1
+                            )
+                        )
+                        raw_json = (resp.text or "").strip()
+                        if raw_json.startswith("```"):
+                            raw_json = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_json, flags=re.DOTALL).strip()
+
+                        data = json.loads(raw_json)
+                        t_text = (data.get("transcribed_text") or "").strip()
+                        d_lang = (data.get("detected_language") or clean_lang).strip()
+                        conf = float(data.get("confidence", 0.96))
+
+                        if t_text:
+                            print(f"[Gemini STT - {model_name}] Successfully transcribed: '{t_text[:50]}...' in {d_lang}")
+                            return VoiceTranscribeResponse(
+                                transcribed_text=t_text,
+                                detected_language=d_lang,
+                                confidence=conf,
+                                duration_seconds=duration_est
+                            )
+                        else:
+                            # Silence or no speech detected
+                            print(f"[Gemini STT - {model_name}] Silence/no intelligible words detected.")
+                            return VoiceTranscribeResponse(
+                                transcribed_text="",
+                                detected_language=d_lang,
+                                confidence=0.0,
+                                duration_seconds=duration_est
+                            )
+                    except Exception as model_err:
+                        print(f"[Gemini STT - {model_name}] Model attempt error: {model_err}")
+                        continue
+            except Exception as gemini_err:
+                print(f"[Gemini STT] Top-level error: {gemini_err}")
+
+        # 3. Fallback: SpeechRecognition (WAV only)
         import io
         import speech_recognition as sr
 
@@ -445,9 +626,7 @@ class AIPipelineService:
             "odia": "or-IN"
         }
 
-        clean_lang = (language_hint or "English").strip().lower()
-        locale = LANG_LOCALE_MAP.get(clean_lang, "en-IN")
-        duration_est = max(1.0, round(len(audio_bytes) / 32000.0, 1))
+        locale = LANG_LOCALE_MAP.get(clean_lang.lower(), "en-IN")
 
         recognizer = sr.Recognizer()
         recognizer.energy_threshold = 300
@@ -460,16 +639,15 @@ class AIPipelineService:
             if text and text.strip():
                 return VoiceTranscribeResponse(
                     transcribed_text=text.strip(),
-                    detected_language=language_hint.capitalize(),
+                    detected_language=clean_lang.capitalize(),
                     confidence=0.96,
                     duration_seconds=duration_est
                 )
         except sr.UnknownValueError:
-            # Unintelligible or silence, return fallback scenario for testing or empty message
             print(f"[STT] No intelligible words detected for {language_hint}, falling back to language scenario")
             return cls.transcribe_voice(language_hint=language_hint)
         except Exception as e:
-            print(f"[STT] Live recognition note: {e}, falling back to language scenario")
-            return cls.transcribe_voice(language_hint=language_hint)
+            print(f"[STT] SpeechRecognition fallback note: {e}")
 
+        # 4. Fallback to realistic language demonstration sample
         return cls.transcribe_voice(language_hint=language_hint)
