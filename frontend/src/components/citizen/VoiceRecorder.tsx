@@ -309,26 +309,18 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         try {
           // Upload audio blob to backend -> Google Gemini AI STT
           const res = await apiService.uploadVoiceAudio(audioBlob, activeLangOption.name);
+          const transcript = (res.text || res.transcribed_text || '').trim();
 
-          if (res.transcribed_text && res.transcribed_text.trim().length > 0) {
-            handleCompleteSuccess(res.transcribed_text.trim(), res.detected_language || activeLangOption.name);
-          } else if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
-            // Fallback to interim SpeechRecognition text if Gemini detected silence
-            handleCompleteSuccess(liveTranscriptRef.current.trim(), activeLangOption.name);
+          if (transcript.length > 0) {
+            handleCompleteSuccess(transcript, res.detected_language || activeLangOption.name);
           } else {
             setVoiceState('ERROR');
-            setErrorMessage('No clear speech was detected in your recording. Please try speaking closer to your microphone or use one of the preset samples below.');
+            setErrorMessage('No intelligible speech was detected in your recording. Please hold the microphone closer, speak clearly, or select a regional voice sample below.');
           }
         } catch (apiErr: any) {
-          console.error('[VoiceRecorder] Gemini transcription error:', apiErr);
-
-          // Check if speech recognition preview caught words as fallback
-          if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
-            handleCompleteSuccess(liveTranscriptRef.current.trim(), activeLangOption.name);
-          } else {
-            setVoiceState('ERROR');
-            setErrorMessage('Voice transcription failed. Please check your internet connection or use a regional voice prompt below.');
-          }
+          console.error('[VoiceRecorder] Backend transcription error:', apiErr);
+          setVoiceState('ERROR');
+          setErrorMessage(apiErr?.message || 'Voice transcription failed on server. Please try again.');
         }
       };
 

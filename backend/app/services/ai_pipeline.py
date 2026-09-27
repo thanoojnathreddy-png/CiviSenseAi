@@ -1,8 +1,12 @@
 import os
 import json
 import re
+import logging
 from typing import Dict, Any, List, Optional
+from fastapi import HTTPException
 from app.models.request_models import AIStructuredExtraction, VoiceTranscribeResponse
+
+logger = logging.getLogger("civicpulse.ai_pipeline")
 
 from pathlib import Path
 from dotenv import load_dotenv
@@ -518,136 +522,132 @@ class AIPipelineService:
         language_hint: str = "English",
         mime_type: Optional[str] = None
     ) -> VoiceTranscribeResponse:
-        """Transcribes raw recorded audio bytes (WebM, WAV, MP3, OGG) using Google Gemini AI, with SpeechRecognition fallback."""
+        """Transcribes raw recorded audio bytes (WebM, WAV, MP3, OGG, MP4) using Google Gemini AI."""
         clean_lang = (language_hint or "English").strip()
         duration_est = max(1.0, round(len(audio_bytes) / 32000.0, 1))
 
-        # 1. Detect audio MIME type if not provided
-        detected_mime = (mime_type or "").strip().lower()
-        if not detected_mime or not detected_mime.startswith("audio/"):
+        if len(audio_bytes) < 32:
+            logger.warning(f"[Voice STT] Audio file too small: {len(audio_bytes)} bytes")
+            raise HTTPException(status_code=400, detail="Audio recording is empty or corrupt. Please speak into the microphone and try again.")
+
+        # 1. Clean and detect audio MIME type (strip parameters like ;codecs=opus)
+        raw_mime = (mime_type or "").strip().lower()
+        clean_mime = raw_mime.split(";")[0].strip()
+
+        if not clean_mime or not clean_mime.startswith("audio/"):
             if audio_bytes.startswith(b"RIFF"):
-                detected_mime = "audio/wav"
+                clean_mime = "audio/wav"
             elif audio_bytes.startswith(b"\x1a\x45\xdf\xa3"):
-                detected_mime = "audio/webm"
+                clean_mime = "audio/webm"
             elif audio_bytes.startswith(b"OggS"):
-                detected_mime = "audio/ogg"
+                clean_mime = "audio/ogg"
             elif b"ftyp" in audio_bytes[:32]:
-                detected_mime = "audio/mp4"
+                clean_mime = "audio/mp4"
             else:
-                detected_mime = "audio/webm"
+                clean_mime = "audio/webm"
 
-        # 2. Try Google Gemini API Transcription
+        logger.info(f"[Voice STT] Processing recording: {len(audio_bytes)} bytes | MIME: {clean_mime} | language_hint: {clean_lang}")
+
+        # 2. Check for GEMINI_API_KEY in backend environment
+        api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+        if not api_key:
+            logger.error("[Voice STT] Backend configuration error: GEMINI_API_KEY is not configured in environment variables.")
+            raise HTTPException(
+                status_code=500,
+                detail="Server configuration error: GEMINI_API_KEY is missing on the backend server. Please configure the GEMINI_API_KEY environment variable in your Render dashboard settings."
+            )
+
         client = get_gemini_client()
-        if client:
-            try:
-                from google.genai import types
+        if not client:
+            logger.error("[Voice STT] Failed to initialize Google GenAI client.")
+            raise HTTPException(
+                status_code=500,
+                detail="Server configuration error: Failed to initialize Google Gemini AI client with the configured GEMINI_API_KEY."
+            )
 
-                part = types.Part.from_bytes(
-                    data=audio_bytes,
-                    mime_type=detected_mime
-                )
-
-                prompt = (
-                    f"You are the multilingual speech-to-text transcriber for CivicPulse AI, a digital public good citizen feedback platform. "
-                    f"The citizen spoke in {clean_lang} or another regional Indian/global language (e.g. Telugu, Hindi, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia, English). "
-                    f"Task instructions:\n"
-                    f"1. Transcribe the citizen's exact spoken words verbatim in their native language and script (e.g. Telugu script for Telugu, Devanagari script for Hindi, Latin for English).\n"
-                    f"2. Detect the spoken language.\n"
-                    f"3. If no speech is detected (only silence, ambient noise, or tone), set transcribed_text to an empty string ''.\n"
-                    f"Output strictly valid JSON with this format:\n"
-                    f'{{"transcribed_text": "<exact words spoken>", "detected_language": "<Language Name>", "confidence": 0.98}}'
-                )
-
-                # Cascade across fast & stable Gemini models
-                candidate_models = [
-                    "gemini-3.5-flash-lite",
-                    "gemini-3.7-flash",
-                    "gemini-3.8-flash",
-                    "gemini-flash-latest"
-                ]
-
-                for model_name in candidate_models:
-                    try:
-                        resp = client.models.generate_content(
-                            model=model_name,
-                            contents=[part, prompt],
-                            config=types.GenerateContentConfig(
-                                response_mime_type="application/json",
-                                temperature=0.1
-                            )
-                        )
-                        raw_json = (resp.text or "").strip()
-                        if raw_json.startswith("```"):
-                            raw_json = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_json, flags=re.DOTALL).strip()
-
-                        data = json.loads(raw_json)
-                        t_text = (data.get("transcribed_text") or "").strip()
-                        d_lang = (data.get("detected_language") or clean_lang).strip()
-                        conf = float(data.get("confidence", 0.96))
-
-                        if t_text:
-                            print(f"[Gemini STT - {model_name}] Successfully transcribed: '{t_text[:50]}...' in {d_lang}")
-                            return VoiceTranscribeResponse(
-                                transcribed_text=t_text,
-                                detected_language=d_lang,
-                                confidence=conf,
-                                duration_seconds=duration_est
-                            )
-                        else:
-                            # Silence or no speech detected
-                            print(f"[Gemini STT - {model_name}] Silence/no intelligible words detected.")
-                            return VoiceTranscribeResponse(
-                                transcribed_text="",
-                                detected_language=d_lang,
-                                confidence=0.0,
-                                duration_seconds=duration_est
-                            )
-                    except Exception as model_err:
-                        print(f"[Gemini STT - {model_name}] Model attempt error: {model_err}")
-                        continue
-            except Exception as gemini_err:
-                print(f"[Gemini STT] Top-level error: {gemini_err}")
-
-        # 3. Fallback: SpeechRecognition (WAV only)
-        import io
-        import speech_recognition as sr
-
-        LANG_LOCALE_MAP = {
-            "english": "en-IN",
-            "hindi": "hi-IN",
-            "telugu": "te-IN",
-            "tamil": "ta-IN",
-            "kannada": "kn-IN",
-            "malayalam": "ml-IN",
-            "marathi": "mr-IN",
-            "bengali": "bn-IN",
-            "gujarati": "gu-IN",
-            "punjabi": "pa-IN",
-            "odia": "or-IN"
-        }
-
-        locale = LANG_LOCALE_MAP.get(clean_lang.lower(), "en-IN")
-
-        recognizer = sr.Recognizer()
-        recognizer.energy_threshold = 300
-        recognizer.dynamic_energy_threshold = True
-
+        # 3. Transcribe audio with Google Gemini
         try:
-            with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
-                audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data, language=locale)
-            if text and text.strip():
-                return VoiceTranscribeResponse(
-                    transcribed_text=text.strip(),
-                    detected_language=clean_lang.capitalize(),
-                    confidence=0.96,
-                    duration_seconds=duration_est
-                )
-        except sr.UnknownValueError:
-            print(f"[STT] No intelligible words detected for {language_hint}, falling back to language scenario")
-            return cls.transcribe_voice(language_hint=language_hint)
-        except Exception as e:
-            print(f"[STT] SpeechRecognition fallback note: {e}")
+            from google.genai import types
 
-        # 4. Fallback to realistic language demonstration sample
-        return cls.transcribe_voice(language_hint=language_hint)
+            part = types.Part.from_bytes(
+                data=audio_bytes,
+                mime_type=clean_mime
+            )
+
+            prompt = (
+                f"You are the official speech-to-text transcriber for CivicPulse AI / CiviSense AI, a digital public good citizen feedback platform. "
+                f"The citizen spoke in {clean_lang} or another regional Indian/global language (e.g. Telugu, Hindi, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia, English). "
+                f"Task instructions:\n"
+                f"1. Transcribe the citizen's exact spoken words verbatim in their native language and script (e.g. Telugu script for Telugu, Devanagari script for Hindi, Latin for English).\n"
+                f"2. Detect the spoken language.\n"
+                f"3. If no speech is detected (only silence, ambient noise, or tone), set transcribed_text to an empty string ''.\n"
+                f"Output strictly valid JSON with this format:\n"
+                f'{{"transcribed_text": "<exact words spoken>", "detected_language": "<Language Name>", "confidence": 0.98}}'
+            )
+
+            candidate_models = [
+                "gemini-2.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.7-flash",
+                "gemini-3.8-flash",
+                "gemini-flash-latest"
+            ]
+
+            last_error = None
+            for model_name in candidate_models:
+                try:
+                    logger.info(f"[Voice STT] Invoking Gemini model: {model_name}...")
+                    resp = client.models.generate_content(
+                        model=model_name,
+                        contents=[part, prompt],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.1
+                        )
+                    )
+                    raw_json = (resp.text or "").strip()
+                    if raw_json.startswith("```"):
+                        raw_json = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_json, flags=re.DOTALL).strip()
+
+                    data = json.loads(raw_json)
+                    t_text = (data.get("transcribed_text") or "").strip()
+                    d_lang = (data.get("detected_language") or clean_lang).strip()
+                    conf = float(data.get("confidence", 0.96))
+
+                    if t_text:
+                        logger.info(f"[Voice STT - {model_name}] Success: '{t_text[:80]}' in {d_lang}")
+                        return VoiceTranscribeResponse(
+                            text=t_text,
+                            transcribed_text=t_text,
+                            detected_language=d_lang,
+                            confidence=conf,
+                            duration_seconds=duration_est
+                        )
+                    else:
+                        logger.info(f"[Voice STT - {model_name}] Audio processed, but no speech detected (silence or ambient noise).")
+                        return VoiceTranscribeResponse(
+                            text="",
+                            transcribed_text="",
+                            detected_language=d_lang,
+                            confidence=0.0,
+                            duration_seconds=duration_est
+                        )
+                except Exception as model_err:
+                    logger.warning(f"[Voice STT - {model_name}] Model error: {model_err}")
+                    last_error = model_err
+                    continue
+
+            logger.error(f"[Voice STT] All Gemini models failed. Last error: {last_error}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gemini speech-to-text service failed: {str(last_error)}"
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception(f"[Voice STT] Unexpected transcription error: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected error during voice transcription: {str(e)}"
+            )

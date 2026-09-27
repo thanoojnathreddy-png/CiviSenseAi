@@ -61,7 +61,14 @@ class VoiceTranscribeRequest(BaseModel):
     sample_id: Optional[str] = None
 
 class VoiceTranscribeResponse(BaseModel):
-    transcribed_text: str
-    detected_language: str
-    confidence: float
-    duration_seconds: float
+    text: str = Field(default="", description="Transcribed civic complaint text")
+    transcribed_text: str = Field(default="", description="Transcribed civic complaint text alias")
+    detected_language: str = Field(default="English", description="Detected language of speech")
+    confidence: float = Field(default=0.96, description="Transcription confidence score")
+    duration_seconds: float = Field(default=1.0, description="Audio duration in seconds")
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.text and self.transcribed_text:
+            self.text = self.transcribed_text
+        elif not self.transcribed_text and self.text:
+            self.transcribed_text = self.text

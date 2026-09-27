@@ -74,4 +74,17 @@ def test_transcribe_audio_upload():
     files = {"file": ("test_recording.wav", io.BytesIO(fake_wav), "audio/wav")}
     res = client.post("/api/transcribe-audio", files=files, data={"language_hint": "English"})
     assert res.status_code == 200
-    assert "transcribed_text" in res.json()
+    data = res.json()
+    assert "text" in data
+    assert "transcribed_text" in data
+    assert data["text"] == data["transcribed_text"]
+
+def test_transcribe_audio_root_alias():
+    import io
+    fake_wav = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+    files = {"file": ("test_recording.wav", io.BytesIO(fake_wav), "audio/wav")}
+    res = client.post("/transcribe-audio", files=files, data={"language_hint": "English"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "text" in data
+    assert "transcribed_text" in data

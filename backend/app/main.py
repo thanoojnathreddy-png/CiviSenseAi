@@ -25,6 +25,18 @@ app.include_router(recommendations.router)
 app.include_router(demographics.router)
 app.include_router(insights.router)
 
+# Mount direct alias so both /api/transcribe-audio and /transcribe-audio succeed without 404
+from app.routers.requests import transcribe_audio_file
+from app.models.request_models import VoiceTranscribeResponse
+
+app.add_api_route(
+    "/transcribe-audio",
+    transcribe_audio_file,
+    methods=["POST"],
+    response_model=VoiceTranscribeResponse,
+    tags=["Citizen Requests"]
+)
+
 @app.on_event("startup")
 def on_startup():
     from app.db.session import init_db
