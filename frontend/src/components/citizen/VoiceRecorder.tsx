@@ -7,141 +7,17 @@ import {
   Radio,
   AlertCircle,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useTranslation, SUPPORTED_LANGUAGES, LanguageOption } from '../../i18n';
 
-export type VoiceRecordingState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
+export type VoiceRecordingState = 'IDLE' | 'LISTENING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
 
 interface VoiceRecorderProps {
   language: string;
   onTranscriptionComplete: (text: string, detectedLang: string) => void;
-}
-
-// Universal in-browser 16kHz 16-bit Mono WAV recorder
-class AudioStreamRecorder {
-  private mediaStream: MediaStream | null = null;
-  private audioContext: AudioContext | null = null;
-  private processor: ScriptProcessorNode | null = null;
-  private inputNode: MediaStreamAudioSourceNode | null = null;
-  private audioBuffers: Float32Array[] = [];
-  private inputSampleRate: number = 44100;
-
-  async start(): Promise<void> {
-    this.audioBuffers = [];
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    this.audioContext = new AudioContextClass();
-    this.inputSampleRate = this.audioContext.sampleRate;
-    this.inputNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-
-    // Buffer size 4096 gives reliable, smooth chunks across all desktop and mobile browsers
-    this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-    this.processor.onaudioprocess = (e) => {
-      const channelData = e.inputBuffer.getChannelData(0);
-      this.audioBuffers.push(new Float32Array(channelData));
-    };
-
-    this.inputNode.connect(this.processor);
-    this.processor.connect(this.audioContext.destination);
-  }
-
-  stop(): Blob | null {
-    if (this.processor) {
-      try { this.processor.disconnect(); } catch (e) {}
-      this.processor = null;
-    }
-    if (this.inputNode) {
-      try { this.inputNode.disconnect(); } catch (e) {}
-      this.inputNode = null;
-    }
-    if (this.audioContext) {
-      try { this.audioContext.close(); } catch (e) {}
-      this.audioContext = null;
-    }
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => {
-        try { track.stop(); } catch (e) {}
-      });
-      this.mediaStream = null;
-    }
-
-    if (this.audioBuffers.length === 0) return null;
-
-    // Concatenate all PCM chunks
-    const totalLength = this.audioBuffers.reduce((acc, b) => acc + b.length, 0);
-    const merged = new Float32Array(totalLength);
-    let offset = 0;
-    for (const b of this.audioBuffers) {
-      merged.set(b, offset);
-      offset += b.length;
-    }
-
-    // Downsample to 16000 Hz for speech recognition models
-    const targetSampleRate = 16000;
-    const downsampled = this.downsample(merged, this.inputSampleRate, targetSampleRate);
-
-    // Encode to standard 16-bit PCM WAV
-    return this.encodeWAV(downsampled, targetSampleRate);
-  }
-
-  private downsample(buffer: Float32Array, fromRate: number, toRate: number): Float32Array {
-    if (fromRate === toRate) return buffer;
-    const ratio = fromRate / toRate;
-    const newLength = Math.round(buffer.length / ratio);
-    const result = new Float32Array(newLength);
-    for (let i = 0; i < newLength; i++) {
-      result[i] = buffer[Math.round(i * ratio)] || 0;
-    }
-    return result;
-  }
-
-  private encodeWAV(samples: Float32Array, sampleRate: number): Blob {
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-
-    const writeString = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i++) {
-        view.setUint8(offset + i, str.charCodeAt(i));
-      }
-    };
-
-    // RIFF chunk descriptor
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + samples.length * 2, true);
-    writeString(8, 'WAVE');
-    // "fmt " sub-chunk
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-    view.setUint16(20, 1, true);  // AudioFormat (1 = PCM)
-    view.setUint16(22, 1, true);  // NumChannels (1 = Mono)
-    view.setUint32(24, sampleRate, true); // SampleRate
-    view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
-    view.setUint16(32, 2, true);  // BlockAlign (NumChannels * BitsPerSample/8)
-    view.setUint16(34, 16, true); // BitsPerSample (16 bits)
-    // "data" sub-chunk
-    writeString(36, 'data');
-    view.setUint32(40, samples.length * 2, true);
-
-    // Write PCM 16-bit samples
-    let index = 44;
-    for (let i = 0; i < samples.length; i++) {
-      const s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      index += 2;
-    }
-
-    return new Blob([view], { type: 'audio/wav' });
-  }
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
@@ -154,22 +30,25 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [lastTranscribedText, setLastTranscribedText] = useState<string | null>(null);
+  const [hasDetectedSpeech, setHasDetectedSpeech] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [voiceSamples, setVoiceSamples] = useState<any[]>([]);
 
   const recognitionRef = useRef<any>(null);
-  const audioRecorderRef = useRef<AudioStreamRecorder | null>(null);
-  const isRecordingRef = useRef<boolean>(false);
+  const isListeningRef = useRef<boolean>(false);
   const isStoppingRef = useRef<boolean>(false);
   const finalTranscriptRef = useRef<string>('');
   const liveTranscriptRef = useRef<string>('');
-  const browserSpeechFailedRef = useRef<boolean>(false);
+  const hasReceivedSpeechRef = useRef<boolean>(false);
+  const stopTimeoutRef = useRef<any>(null);
 
-  // Check Web Speech API browser support
+  // Check Web Speech API browser availability
   const SpeechRecognitionClass = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
   }, []);
+
+  const isBrowserSupported = Boolean(SpeechRecognitionClass);
 
   // Resolve speech recognition language option strictly from the selected language
   const activeLangOption: LanguageOption = useMemo(() => {
@@ -185,7 +64,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   // Recording duration timer
   useEffect(() => {
     let interval: any;
-    if (voiceState === 'RECORDING') {
+    if (voiceState === 'LISTENING') {
       interval = setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
@@ -195,7 +74,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     return () => clearInterval(interval);
   }, [voiceState]);
 
-  // Fetch preset demonstration voice samples from backend for testing
+  // Fetch preset demonstration voice samples from backend for quick regional testing
   useEffect(() => {
     apiService.getVoiceSamples().then((samples) => {
       setVoiceSamples(samples);
@@ -207,176 +86,233 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      isRecordingRef.current = false;
+      isListeningRef.current = false;
       isStoppingRef.current = false;
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch (e) {}
+      if (stopTimeoutRef.current) {
+        clearTimeout(stopTimeoutRef.current);
       }
-      if (audioRecorderRef.current) {
-        try { audioRecorderRef.current.stop(); } catch (e) {}
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // ignore
+        }
       }
     };
   }, []);
 
-  // Finalize successful transcript
-  const finalizeSuccess = useCallback((transcript: string) => {
-    isRecordingRef.current = false;
+  // Finalize successful transcript into the citizen feedback input
+  const finalizeRecognition = useCallback(() => {
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+
+    isListeningRef.current = false;
     isStoppingRef.current = false;
 
-    const clean = transcript.trim();
-    if (clean) {
+    const transcript = (finalTranscriptRef.current || liveTranscriptRef.current).trim();
+
+    if (transcript.length > 0) {
+      console.log('VOICE TRANSCRIPTION COMPLETE:', transcript);
       setVoiceState('SUCCESS');
-      setLastTranscribedText(clean);
+      setLastTranscribedText(transcript);
       setErrorMessage(null);
-      onTranscriptionComplete(clean, activeLangOption.name);
+      onTranscriptionComplete(transcript, activeLangOption.name);
     } else {
+      console.log('VOICE ENDED WITH NO SPEECH DETECTED');
       setVoiceState('ERROR');
-      setErrorMessage('No speech was detected. Please try speaking closer to your microphone and try again.');
+      setErrorMessage('No speech was detected in your recording. Please try speaking closer to your microphone, or enter your concern manually.');
     }
   }, [activeLangOption.name, onTranscriptionComplete]);
 
-  // Start Voice Recording
+  // Start Voice Recognition
   const handleStartRecording = async () => {
     setErrorMessage(null);
     setLiveTranscript('');
     finalTranscriptRef.current = '';
     liveTranscriptRef.current = '';
+    hasReceivedSpeechRef.current = false;
+    setHasDetectedSpeech(false);
     isStoppingRef.current = false;
-    browserSpeechFailedRef.current = false;
 
-    // 1. Microphone device and permission check
+    // 1. Browser compatibility check
+    if (!SpeechRecognitionClass) {
+      setVoiceState('ERROR');
+      setErrorMessage(
+        'Voice input is not supported in this browser. Please use Chrome/Edge or enter your concern manually.'
+      );
+      return;
+    }
+
+    // 2. Microphone device and permission test via getUserMedia()
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setVoiceState('ERROR');
       setErrorMessage('Microphone access is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
       return;
     }
 
-    // 2. Start Hardware Audio Stream Recorder (Captures 16kHz WAV)
     try {
-      const recorder = new AudioStreamRecorder();
-      await recorder.start();
-      audioRecorderRef.current = recorder;
+      // Test microphone access and verify permissions
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Correctly release microphone stream immediately so SpeechRecognition has exclusive access!
+      stream.getTracks().forEach((track) => track.stop());
     } catch (err: any) {
-      console.error('[VoiceRecorder] getUserMedia error:', err);
+      console.error('[Microphone] Permission/access error:', err);
       setVoiceState('ERROR');
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMessage('Microphone access was blocked. Please allow microphone access in your browser settings.');
+        setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser settings.');
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setErrorMessage('No microphone was detected. Please connect a microphone and try again.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setErrorMessage('Microphone is already in use by another application.');
       } else {
-        setErrorMessage('Could not initialize microphone. Please check your browser audio permissions.');
+        setErrorMessage('Could not access microphone. Please check your browser audio permissions.');
       }
       return;
     }
 
-    // Hardware recording successfully started
-    isRecordingRef.current = true;
-    setVoiceState('RECORDING');
-    setErrorMessage(null);
+    // 3. Initialize fresh SpeechRecognition instance with the currently active language
+    try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // ignore
+        }
+      }
 
-    // 3. Simultaneously try browser Web Speech API for real-time live preview
-    if (SpeechRecognitionClass) {
-      try {
-        if (recognitionRef.current) {
-          try { recognitionRef.current.abort(); } catch (e) {}
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = activeLangOption.speechLang || 'en-IN';
+      recognition.maxAlternatives = 1;
+
+      console.log('VOICE STARTED');
+      console.log('LANGUAGE:', recognition.lang);
+
+      recognition.onstart = () => {
+        isListeningRef.current = true;
+        setVoiceState('LISTENING');
+        setErrorMessage(null);
+        console.log('RECOGNITION ACTIVE: true');
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
+
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          const text = res[0]?.transcript || '';
+          if (res.isFinal) {
+            final += text + ' ';
+          } else {
+            interim += text;
+          }
         }
 
-        const recognition = new SpeechRecognitionClass();
-        recognition.lang = activeLangOption.speechLang || 'en-IN';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
+        const currentTotal = (final + interim).trim();
+        if (currentTotal.length > 0) {
+          hasReceivedSpeechRef.current = true;
+          setHasDetectedSpeech(true);
+          finalTranscriptRef.current = final.trim();
+          liveTranscriptRef.current = currentTotal;
+          setLiveTranscript(currentTotal);
+          console.log('RESULT RECEIVED:', currentTotal);
+        }
+      };
 
-        recognition.onresult = (event: any) => {
-          let interim = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const result = event.results[i];
-            const text = result[0]?.transcript || '';
-            if (result.isFinal) {
-              finalTranscriptRef.current += text + ' ';
-            } else {
-              interim += text;
-            }
+      recognition.onerror = (event: any) => {
+        console.log('VOICE ERROR:', event.error, event);
+
+        // Chrome emits 'no-speech' on momentary pauses while speaking.
+        // Do NOT abort or display error while user is actively in LISTENING state!
+        if (event.error === 'no-speech') {
+          console.log('[SpeechRecognition] Momentary pause in speech detected; continuing to listen.');
+          return;
+        }
+
+        if (event.error === 'aborted') {
+          return;
+        }
+
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          isListeningRef.current = false;
+          setVoiceState('ERROR');
+          setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser settings.');
+          return;
+        }
+
+        if (event.error === 'audio-capture') {
+          isListeningRef.current = false;
+          setVoiceState('ERROR');
+          setErrorMessage('No microphone was detected. Please connect a microphone and try again.');
+          return;
+        }
+
+        if (event.error === 'language-not-supported') {
+          isListeningRef.current = false;
+          setVoiceState('ERROR');
+          setErrorMessage(`Speech recognition is not supported for ${activeLangOption.name} (${activeLangOption.speechLang}) in this browser.`);
+          return;
+        }
+
+        if (event.error === 'network') {
+          console.warn('[SpeechRecognition] Network event received; keeping captured speech if any.');
+          if (hasReceivedSpeechRef.current) {
+            return;
           }
-          const combined = (finalTranscriptRef.current + ' ' + interim).trim();
-          liveTranscriptRef.current = combined;
-          setLiveTranscript(combined);
-        };
+        }
+      };
 
-        recognition.onerror = (event: any) => {
-          console.info('[SpeechRecognition] Browser speech engine message:', event.error);
-          if (event.error === 'network' || event.error === 'service-not-allowed') {
-            // Browser's Google Speech service is blocked or inaccessible.
-            // Do NOT fail the recording! Audio is actively being recorded in WAV and will be transcribed via backend.
-            browserSpeechFailedRef.current = true;
+      recognition.onend = () => {
+        console.log('VOICE ENDED, isListening:', isListeningRef.current, 'isStopping:', isStoppingRef.current);
+
+        // If the user has not clicked Stop, Chrome ended continuous recognition on silence; seamlessly auto-resume
+        if (isListeningRef.current && !isStoppingRef.current) {
+          try {
+            recognition.start();
+            console.log('[SpeechRecognition] Auto-resumed continuous listening session');
+          } catch (e) {
+            console.warn('[SpeechRecognition] Auto-resume caught:', e);
           }
-        };
+        } else if (isStoppingRef.current) {
+          finalizeRecognition();
+        }
+      };
 
-        recognition.onend = () => {
-          // If browser speech ended while recording is still active, restart if not failed
-          if (isRecordingRef.current && !browserSpeechFailedRef.current) {
-            try { recognition.start(); } catch (e) {}
-          }
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-      } catch (err) {
-        console.warn('[SpeechRecognition] Browser speech recognition init ignored:', err);
-        browserSpeechFailedRef.current = true;
-      }
-    } else {
-      browserSpeechFailedRef.current = true;
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (err: any) {
+      console.error('[SpeechRecognition] Failed to initialize:', err);
+      setVoiceState('ERROR');
+      setErrorMessage('Could not initialize speech recognition. Please try again or enter your feedback manually.');
     }
   };
 
-  // Stop Voice Recording & Process Transcription
-  const handleStopRecording = async () => {
-    if (!isRecordingRef.current) return;
-
-    isRecordingRef.current = false;
-    isStoppingRef.current = true;
-    setVoiceState('PROCESSING');
-
-    // 1. Stop SpeechRecognition if running
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) {}
-    }
-
-    // 2. Stop AudioStreamRecorder and retrieve 16kHz WAV Blob
-    let audioBlob: Blob | null = null;
-    if (audioRecorderRef.current) {
-      try {
-        audioBlob = audioRecorderRef.current.stop();
-      } catch (e) {
-        console.warn('[VoiceRecorder] Audio recorder stop warning:', e);
-      }
-      audioRecorderRef.current = null;
-    }
-
-    // 3. If browser speech recognition already captured words, use it immediately
-    const capturedBrowserText = (finalTranscriptRef.current || liveTranscriptRef.current).trim();
-    if (capturedBrowserText.length > 0) {
-      finalizeSuccess(capturedBrowserText);
+  // Stop Voice Recognition
+  const handleStopRecording = () => {
+    if (!isListeningRef.current && !recognitionRef.current) {
       return;
     }
 
-    // 4. Otherwise, transcribe the recorded WAV audio via backend speech-to-text
-    if (audioBlob && audioBlob.size > 1000) {
+    isListeningRef.current = false;
+    isStoppingRef.current = true;
+    setVoiceState('PROCESSING');
+
+    if (recognitionRef.current) {
       try {
-        const res = await apiService.uploadVoiceAudio(audioBlob, activeLangOption.name);
-        if (res && res.transcribed_text && res.transcribed_text.trim()) {
-          finalizeSuccess(res.transcribed_text);
-          return;
-        }
-      } catch (err: any) {
-        console.error('[VoiceRecorder] Backend audio transcription error:', err);
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn('[SpeechRecognition] stop warning:', err);
       }
     }
 
-    // 5. Fallback: if no speech could be recognized
-    setVoiceState('ERROR');
-    setErrorMessage('No speech was detected in your recording. Please try speaking closer to your microphone, or enter your concern manually.');
+    // Safety timeout in case onend does not fire promptly
+    stopTimeoutRef.current = setTimeout(() => {
+      finalizeRecognition();
+    }, 700);
   };
 
   // Select regional voice prompt sample
@@ -385,7 +321,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     setErrorMessage(null);
     try {
       const res = await apiService.transcribeVoice({ sample_id: sampleId });
-      finalizeSuccess(res.transcribed_text);
+      finalTranscriptRef.current = res.transcribed_text;
+      liveTranscriptRef.current = res.transcribed_text;
+      finalizeRecognition();
     } catch (err) {
       console.error('[VoiceRecorder] Preset transcription error:', err);
       setVoiceState('ERROR');
@@ -398,7 +336,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {/* Header with Active Recognition Language */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider">
-          <Radio className={`w-4 h-4 ${voiceState === 'RECORDING' ? 'text-rose-600 animate-pulse' : 'text-blue-600'}`} />
+          <Radio className={`w-4 h-4 ${voiceState === 'LISTENING' ? 'text-rose-600 animate-pulse' : 'text-blue-600'}`} />
           <span>Voice Intake</span>
         </div>
         <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded font-mono font-medium flex items-center gap-1.5">
@@ -418,7 +356,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {/* Recording Interaction Box */}
       <div className="flex flex-col items-center justify-center py-6 bg-white rounded-lg border border-slate-200 shadow-2xs space-y-4">
         {/* Visual Icon / Waveform */}
-        {voiceState === 'RECORDING' ? (
+        {voiceState === 'LISTENING' ? (
           <div className="flex items-center gap-1.5 h-12 px-6">
             {[35, 75, 95, 60, 90, 45, 100, 80, 50, 85, 65, 90, 55, 70, 40].map((h, i) => (
               <div
@@ -446,40 +384,49 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         )}
 
         {/* Status Labels */}
-        <div className="text-center px-4 max-w-md space-y-1">
-          {voiceState === 'RECORDING' ? (
+        <div className="text-center px-4 max-w-md space-y-1.5">
+          {voiceState === 'LISTENING' ? (
             <div>
               <div className="text-rose-600 font-mono text-sm font-bold flex items-center justify-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
-                <span>🔴 Listening... ({recordingSeconds < 10 ? `0${recordingSeconds}` : recordingSeconds}s)</span>
+                <span>🔴 Listening... Speak now ({recordingSeconds < 10 ? `0${recordingSeconds}` : recordingSeconds}s)</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Speak clearly in <span className="font-semibold text-slate-800">{activeLangOption.nativeName} ({activeLangOption.name})</span>
+              <p className="text-[11px] text-slate-600 mt-1">
+                🎙 Listening in <span className="font-bold text-slate-900">{activeLangOption.nativeName} ({activeLangOption.name})</span>
               </p>
+
+              {hasDetectedSpeech && (
+                <div className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>✓ Speech detected</span>
+                </div>
+              )}
+
               {liveTranscript && (
-                <div className="mt-2 text-xs text-slate-800 bg-slate-50 border border-slate-200 p-2.5 rounded italic text-left max-h-24 overflow-y-auto font-sans">
+                <div className="mt-2.5 text-xs text-slate-800 bg-slate-50 border border-slate-200 p-3 rounded-lg italic text-left max-h-28 overflow-y-auto font-sans shadow-2xs">
                   "{liveTranscript}"
                 </div>
               )}
             </div>
           ) : voiceState === 'PROCESSING' ? (
             <div className="text-blue-600 font-mono text-xs font-semibold flex items-center justify-center gap-2 py-1">
-              <span>⏳ Processing voice... Transcribing in {activeLangOption.name}</span>
+              <span>⏳ Processing voice... Finalizing transcript in {activeLangOption.name}</span>
             </div>
           ) : voiceState === 'SUCCESS' ? (
-            <div className="text-emerald-700 text-xs font-semibold">
-              ✅ Transcript added to feedback field
+            <div className="text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>✓ Speech detected & added to feedback input</span>
             </div>
           ) : (
             <div className="text-xs text-slate-600 font-medium">
-              Click the microphone to start speaking in <span className="font-bold text-slate-900">{activeLangOption.name}</span>.
+              Click the microphone to speak in <span className="font-bold text-slate-900">{activeLangOption.name}</span>.
             </div>
           )}
         </div>
 
-        {/* Controls: Start / Stop Button */}
+        {/* Controls: Start / Stop / Retry Buttons */}
         <div className="flex items-center gap-3">
-          {voiceState === 'RECORDING' ? (
+          {voiceState === 'LISTENING' ? (
             <button
               type="button"
               onClick={handleStopRecording}
@@ -495,7 +442,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-400 text-white text-xs font-bold shadow-sm cursor-not-allowed opacity-75"
             >
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Transcribing...</span>
+              <span>Processing...</span>
             </button>
           ) : voiceState === 'SUCCESS' ? (
             <div className="flex items-center gap-2">
@@ -508,17 +455,33 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 <span>🎙 Speak More</span>
               </button>
             </div>
+          ) : voiceState === 'ERROR' ? (
+            <button
+              type="button"
+              onClick={handleStartRecording}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-98"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>🎙 Try Again</span>
+            </button>
           ) : (
             <button
               type="button"
               onClick={handleStartRecording}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+              disabled={!isBrowserSupported}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
             >
               <Mic className="w-4 h-4" />
               <span>🎙 Click to speak</span>
             </button>
           )}
         </div>
+
+        {!isBrowserSupported && (
+          <p className="text-[11px] text-amber-700 font-medium px-4 text-center">
+            ⚠️ Voice input is not supported in this browser. Please use Chrome/Edge or enter your concern manually.
+          </p>
+        )}
       </div>
 
       {/* Transcribed Speech Confirmation Banner */}
