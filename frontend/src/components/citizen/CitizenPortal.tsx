@@ -199,7 +199,11 @@ export const CitizenPortal: React.FC = () => {
   }, [inputText, language, district]);
 
   const handleVoiceTranscribed = (transcribedText: string, detectedLang: string) => {
-    setInputText(transcribedText);
+    setInputText((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return transcribedText;
+      return `${trimmed} ${transcribedText}`;
+    });
     setIsVoiceSubmitted(true);
     if (detectedLang) {
       setLanguage(detectedLang);
