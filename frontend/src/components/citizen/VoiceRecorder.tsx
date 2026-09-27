@@ -37,9 +37,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef<boolean>(false);
   const isStoppingRef = useRef<boolean>(false);
-  const finalTranscriptRef = useRef<string>('');
+  const accumulatedFinalRef = useRef<string>('');
   const liveTranscriptRef = useRef<string>('');
-  const hasReceivedSpeechRef = useRef<boolean>(false);
   const stopTimeoutRef = useRef<any>(null);
 
   // Check Web Speech API browser availability
@@ -74,7 +73,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     return () => clearInterval(interval);
   }, [voiceState]);
 
-  // Fetch preset demonstration voice samples from backend for quick regional testing
+  // Fetch preset demonstration voice samples from backend for testing
   useEffect(() => {
     apiService.getVoiceSamples().then((samples) => {
       setVoiceSamples(samples);
@@ -101,7 +100,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     };
   }, []);
 
-  // Finalize successful transcript into the citizen feedback input
+  // Finalize transcript and update parent input box
   const finalizeRecognition = useCallback(() => {
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
@@ -111,7 +110,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     isListeningRef.current = false;
     isStoppingRef.current = false;
 
-    const transcript = (finalTranscriptRef.current || liveTranscriptRef.current).trim();
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+
+    const transcript = (
+      accumulatedFinalRef.current + ' ' + liveTranscriptRef.current
+    ).trim();
 
     if (transcript.length > 0) {
       console.log('VOICE TRANSCRIPTION COMPLETE:', transcript);
@@ -126,60 +134,18 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }
   }, [activeLangOption.name, onTranscriptionComplete]);
 
-  // Start Voice Recognition
-  const handleStartRecording = async () => {
-    setErrorMessage(null);
-    setLiveTranscript('');
-    finalTranscriptRef.current = '';
-    liveTranscriptRef.current = '';
-    hasReceivedSpeechRef.current = false;
-    setHasDetectedSpeech(false);
-    isStoppingRef.current = false;
-
-    // 1. Browser compatibility check
+  // Instantiate and start a fresh SpeechRecognition session
+  const startNewSession = useCallback(() => {
     if (!SpeechRecognitionClass) {
       setVoiceState('ERROR');
-      setErrorMessage(
-        'Voice input is not supported in this browser. Please use Chrome/Edge or enter your concern manually.'
-      );
+      setErrorMessage('Voice input is not supported in this browser. Please use Chrome/Edge or enter your concern manually.');
       return;
     }
 
-    // 2. Microphone device and permission test via getUserMedia()
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setVoiceState('ERROR');
-      setErrorMessage('Microphone access is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
-      return;
-    }
-
-    try {
-      // Test microphone access and verify permissions
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Correctly release microphone stream immediately so SpeechRecognition has exclusive access!
-      stream.getTracks().forEach((track) => track.stop());
-    } catch (err: any) {
-      console.error('[Microphone] Permission/access error:', err);
-      setVoiceState('ERROR');
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser settings.');
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setErrorMessage('No microphone was detected. Please connect a microphone and try again.');
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        setErrorMessage('Microphone is already in use by another application.');
-      } else {
-        setErrorMessage('Could not access microphone. Please check your browser audio permissions.');
-      }
-      return;
-    }
-
-    // 3. Initialize fresh SpeechRecognition instance with the currently active language
     try {
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {
-          // ignore
-        }
+        try { recognitionRef.current.abort(); } catch (e) {}
+        recognitionRef.current = null;
       }
 
       const recognition = new SpeechRecognitionClass();
@@ -199,37 +165,39 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       };
 
       recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
+        let currentInterim = '';
+        let currentFinal = '';
 
-        for (let i = 0; i < event.results.length; ++i) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
           const res = event.results[i];
           const text = res[0]?.transcript || '';
           if (res.isFinal) {
-            final += text + ' ';
+            currentFinal += text + ' ';
           } else {
-            interim += text;
+            currentInterim += text;
           }
         }
 
-        const currentTotal = (final + interim).trim();
-        if (currentTotal.length > 0) {
-          hasReceivedSpeechRef.current = true;
+        if (currentFinal) {
+          accumulatedFinalRef.current += currentFinal;
+        }
+
+        const totalDisplay = (accumulatedFinalRef.current + ' ' + currentInterim).trim();
+        if (totalDisplay.length > 0) {
+          liveTranscriptRef.current = totalDisplay;
+          setLiveTranscript(totalDisplay);
           setHasDetectedSpeech(true);
-          finalTranscriptRef.current = final.trim();
-          liveTranscriptRef.current = currentTotal;
-          setLiveTranscript(currentTotal);
-          console.log('RESULT RECEIVED:', currentTotal);
+          console.log('RESULT RECEIVED:', totalDisplay);
         }
       };
 
       recognition.onerror = (event: any) => {
-        console.log('VOICE ERROR:', event.error, event);
+        console.log('VOICE ERROR:', event.error);
 
-        // Chrome emits 'no-speech' on momentary pauses while speaking.
-        // Do NOT abort or display error while user is actively in LISTENING state!
+        // In Chrome, 'no-speech' is emitted on momentary pauses between words.
+        // DO NOT stop listening while user is actively in LISTENING state!
         if (event.error === 'no-speech') {
-          console.log('[SpeechRecognition] Momentary pause in speech detected; continuing to listen.');
+          console.log('[SpeechRecognition] Natural speech pause detected; keeping listener active.');
           return;
         }
 
@@ -257,26 +225,19 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           setErrorMessage(`Speech recognition is not supported for ${activeLangOption.name} (${activeLangOption.speechLang}) in this browser.`);
           return;
         }
-
-        if (event.error === 'network') {
-          console.warn('[SpeechRecognition] Network event received; keeping captured speech if any.');
-          if (hasReceivedSpeechRef.current) {
-            return;
-          }
-        }
       };
 
       recognition.onend = () => {
         console.log('VOICE ENDED, isListening:', isListeningRef.current, 'isStopping:', isStoppingRef.current);
 
-        // If the user has not clicked Stop, Chrome ended continuous recognition on silence; seamlessly auto-resume
+        // If the user has NOT clicked stop, Chrome may end continuous session on natural silence.
+        // Seamlessly launch a fresh instance to continue listening without dead-object errors!
         if (isListeningRef.current && !isStoppingRef.current) {
-          try {
-            recognition.start();
-            console.log('[SpeechRecognition] Auto-resumed continuous listening session');
-          } catch (e) {
-            console.warn('[SpeechRecognition] Auto-resume caught:', e);
-          }
+          setTimeout(() => {
+            if (isListeningRef.current && !isStoppingRef.current) {
+              startNewSession();
+            }
+          }, 80);
         } else if (isStoppingRef.current) {
           finalizeRecognition();
         }
@@ -285,10 +246,65 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       recognition.start();
       recognitionRef.current = recognition;
     } catch (err: any) {
-      console.error('[SpeechRecognition] Failed to initialize:', err);
+      console.error('[SpeechRecognition] Session initialization error:', err);
       setVoiceState('ERROR');
-      setErrorMessage('Could not initialize speech recognition. Please try again or enter your feedback manually.');
+      if (err.name === 'NotAllowedError') {
+        setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser settings.');
+      } else {
+        setErrorMessage('Could not initialize speech recognition. Please check your browser audio permissions.');
+      }
     }
+  }, [SpeechRecognitionClass, activeLangOption.speechLang, activeLangOption.name, finalizeRecognition]);
+
+  // Start Voice Recognition
+  const handleStartRecording = async () => {
+    setErrorMessage(null);
+    setLiveTranscript('');
+    accumulatedFinalRef.current = '';
+    liveTranscriptRef.current = '';
+    setHasDetectedSpeech(false);
+    isStoppingRef.current = false;
+
+    // 1. Browser compatibility check
+    if (!SpeechRecognitionClass) {
+      setVoiceState('ERROR');
+      setErrorMessage(
+        'Voice input is not supported in this browser. Please use Chrome/Edge or enter your concern manually.'
+      );
+      return;
+    }
+
+    // 2. Pre-check microphone permission via Permissions API if available (no audio device lock)
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const permStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (permStatus.state === 'denied') {
+          setVoiceState('ERROR');
+          setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser settings.');
+          return;
+        }
+      } catch (e) {
+        // Permissions query not supported on all platforms; continue to SpeechRecognition
+      }
+    }
+
+    // 3. Pre-check if microphone hardware exists
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasMic = devices.some((d) => d.kind === 'audioinput');
+        if (devices.length > 0 && !hasMic) {
+          setVoiceState('ERROR');
+          setErrorMessage('No microphone was detected. Please connect a microphone and try again.');
+          return;
+        }
+      } catch (e) {
+        // Continue to SpeechRecognition
+      }
+    }
+
+    // 4. Start fresh recognition session
+    startNewSession();
   };
 
   // Stop Voice Recognition
@@ -312,7 +328,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     // Safety timeout in case onend does not fire promptly
     stopTimeoutRef.current = setTimeout(() => {
       finalizeRecognition();
-    }, 700);
+    }, 600);
   };
 
   // Select regional voice prompt sample
@@ -321,7 +337,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     setErrorMessage(null);
     try {
       const res = await apiService.transcribeVoice({ sample_id: sampleId });
-      finalTranscriptRef.current = res.transcribed_text;
+      accumulatedFinalRef.current = res.transcribed_text;
       liveTranscriptRef.current = res.transcribed_text;
       finalizeRecognition();
     } catch (err) {
