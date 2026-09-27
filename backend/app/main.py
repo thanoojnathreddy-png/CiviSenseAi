@@ -41,9 +41,10 @@ app.add_api_route(
 def on_startup():
     from app.db.session import init_db
     init_db()
+    from app.services.ai_pipeline import log_startup_diagnostics
+    log_startup_diagnostics()
 
 @app.get("/")
-
 def root():
     return {
         "platform": "CivicPulse AI",
@@ -55,7 +56,18 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    from app.services.ai_pipeline import get_gemini_diagnostics
+    diag = get_gemini_diagnostics()
+    return {
+        "status": "healthy",
+        "gemini_configured": diag["configured"],
+        "gemini_diagnostics": {
+            "key_present": diag["present"],
+            "key_length": diag["length"],
+            "key_whitespace_trimmed": diag["trimmed"],
+            "key_masked_preview": diag["preview"]
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

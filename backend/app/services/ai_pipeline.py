@@ -19,20 +19,85 @@ else:
     load_dotenv()
 
 _GEMINI_CLIENT = None
+_CACHED_API_KEY = None
+
+def get_gemini_diagnostics() -> Dict[str, Any]:
+    """Safe diagnostic reporting for GEMINI_API_KEY without leaking secrets."""
+    raw_key = os.getenv("GEMINI_API_KEY")
+    if raw_key is None:
+        return {
+            "configured": False,
+            "present": False,
+            "length": 0,
+            "trimmed": False,
+            "preview": "Not Set",
+            "is_likely_ai_studio": False
+        }
+    clean_key = raw_key.strip()
+    is_trimmed = (raw_key != clean_key)
+    length = len(clean_key)
+    if length == 0:
+        return {
+            "configured": False,
+            "present": True,
+            "length": 0,
+            "trimmed": is_trimmed,
+            "preview": "Empty",
+            "is_likely_ai_studio": False
+        }
+    if length <= 8:
+        preview = f"{clean_key[:2]}...{clean_key[-2:]}" if length >= 4 else "***"
+    else:
+        preview = f"{clean_key[:4]}...{clean_key[-4:]}"
+
+    # Google AI Studio Gemini API keys typically start with "AIzaSy" and are 39 characters
+    is_ai_studio = clean_key.startswith("AIzaSy") and length == 39
+
+    return {
+        "configured": True,
+        "present": True,
+        "length": length,
+        "trimmed": is_trimmed,
+        "preview": preview,
+        "is_likely_ai_studio": is_ai_studio
+    }
+
+def log_startup_diagnostics():
+    """Logs safe configuration state at startup for Render diagnostics."""
+    diag = get_gemini_diagnostics()
+    if not diag["configured"]:
+        logger.warning(
+            "[Startup Diagnostics] GEMINI_API_KEY is NOT configured in environment. "
+            "Voice-to-text will report a configuration error until GEMINI_API_KEY is configured in Render."
+        )
+    else:
+        logger.info(
+            f"[Startup Diagnostics] GEMINI_API_KEY detected. Length: {diag['length']} chars | "
+            f"Whitespace trimmed: {diag['trimmed']} | Masked preview: {diag['preview']}"
+        )
+        if not diag["is_likely_ai_studio"]:
+            logger.warning(
+                f"[Startup Diagnostics Note] Configured GEMINI_API_KEY has length {diag['length']} and starts with '{diag['preview'][:4]}'. "
+                "Standard Google AI Studio keys typically start with 'AIzaSy' and are 39 characters long. "
+                "If requests fail with API_KEY_INVALID, please verify the key in Google AI Studio (https://aistudio.google.com/)."
+            )
 
 def get_gemini_client():
-    global _GEMINI_CLIENT
-    if _GEMINI_CLIENT is not None:
-        return _GEMINI_CLIENT
-    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    if not api_key:
+    global _GEMINI_CLIENT, _CACHED_API_KEY
+    clean_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not clean_key:
+        _GEMINI_CLIENT = None
+        _CACHED_API_KEY = None
         return None
+    if _GEMINI_CLIENT is not None and _CACHED_API_KEY == clean_key:
+        return _GEMINI_CLIENT
     try:
         from google import genai
-        _GEMINI_CLIENT = genai.Client(api_key=api_key)
+        _GEMINI_CLIENT = genai.Client(api_key=clean_key)
+        _CACHED_API_KEY = clean_key
         return _GEMINI_CLIENT
     except Exception as e:
-        print(f"[Gemini] genai.Client init note: {e}")
+        logger.error(f"[Gemini] genai.Client initialization error: {e}")
         return None
 
 # Multilingual Vocabulary & Entity Dictionaries for BRICS & Indian Languages
@@ -377,7 +442,14 @@ class AIPipelineService:
                     f"Output strictly valid JSON with no markdown formatting."
                 )
 
-                for model_candidate in ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                for model_candidate in [
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.8-flash",
+                    "gemini-flash-latest",
+                    "gemini-3.7-flash",
+                    "gemini-2.0-flash-lite",
+                    "gemini-1.5-flash"
+                ]:
                     try:
                         resp = client.models.generate_content(
                             model=model_candidate,
@@ -549,8 +621,8 @@ class AIPipelineService:
         logger.info(f"[Voice STT] Processing recording: {len(audio_bytes)} bytes | MIME: {clean_mime} | language_hint: {clean_lang}")
 
         # 2. Check for GEMINI_API_KEY in backend environment
-        api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-        if not api_key:
+        diag = get_gemini_diagnostics()
+        if not diag["configured"]:
             logger.error("[Voice STT] Backend configuration error: GEMINI_API_KEY is not configured in environment variables.")
             raise HTTPException(
                 status_code=500,
@@ -586,11 +658,12 @@ class AIPipelineService:
             )
 
             candidate_models = [
-                "gemini-2.5-flash",
                 "gemini-3.5-flash-lite",
-                "gemini-3.7-flash",
                 "gemini-3.8-flash",
-                "gemini-flash-latest"
+                "gemini-flash-latest",
+                "gemini-3.7-flash",
+                "gemini-2.0-flash-lite",
+                "gemini-1.5-flash"
             ]
 
             last_error = None
@@ -633,8 +706,32 @@ class AIPipelineService:
                             duration_seconds=duration_est
                         )
                 except Exception as model_err:
-                    logger.warning(f"[Voice STT - {model_name}] Model error: {model_err}")
+                    err_str = str(model_err)
+                    logger.warning(f"[Voice STT - {model_name}] Model attempt error: {err_str}")
                     last_error = model_err
+
+                    # If Google reports API_KEY_INVALID, fail immediately with a clear, actionable message
+                    if "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
+                        logger.error(
+                            f"[Voice STT] Google rejected GEMINI_API_KEY as invalid (API_KEY_INVALID). "
+                            f"Configured key length: {diag['length']}, preview: '{diag['preview']}'. "
+                            f"Action required: Replace GEMINI_API_KEY in Render dashboard environment settings with a valid key from Google AI Studio."
+                        )
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Gemini API key is configured but Google rejected it as invalid. Please replace GEMINI_API_KEY in Render with a valid Gemini API key from Google AI Studio (https://aistudio.google.com/)."
+                        )
+
+                    # For quota or rate limit, log and try next candidate
+                    if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
+                        logger.warning(f"[Voice STT - {model_name}] Quota exceeded for model {model_name}. Attempting next model...")
+                        continue
+
+                    # For 404 / model not available, try next candidate
+                    if "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str:
+                        logger.warning(f"[Voice STT - {model_name}] Model {model_name} unavailable. Attempting next model...")
+                        continue
+
                     continue
 
             logger.error(f"[Voice STT] All Gemini models failed. Last error: {last_error}")
